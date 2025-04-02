@@ -1,0 +1,3 @@
+openai
+hono
+@google/generative-ai

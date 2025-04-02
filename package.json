@@ -1,0 +1,20 @@
+{
+  "name": "gemini-pool",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "@hono/zod-validator": "^0.4.3",
+    "dotenv": "^16.4.7",
+    "hono": "^4.7.5",
+    "openai": "^4.91.1",
+    "zod": "^3.24.2"
+  }
+}
