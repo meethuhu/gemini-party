@@ -7,15 +7,56 @@ import checkAuth from './auth';
 
 const genai = new Hono();
 
-// Gemini客户端工厂函数
-function getGeminiClient(): GoogleGenAI {
-    return new GoogleGenAI({ apiKey: getGeminiAPIKey() });
-}
-
 // 打印请求信息
 async function printLog(c: any) {
     console.log(await c.req.header());
     console.log(await c.req.json());
+}
+
+// 处理非流式内容生成
+async function handleGenerateContent(ai: GoogleGenAI, modelName: string, body: any) {
+    const response = await ai.models.generateContent({
+        model: modelName,
+        ...body  // 展开所有请求参数
+    });
+    return response;
+}
+
+// 处理流式内容生成
+async function handleStreamGenerateContent(ai: GoogleGenAI, modelName: string, body: any, isGoogleClient: boolean) {
+    const result = await ai.models.generateContentStream({
+        model: modelName,
+        ...body  // 展开所有请求参数
+    });
+
+    // 使用Response对象作为流式响应
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+        async start(controller) {
+            try {
+                for await (const chunk of result) {
+                    // 将每个块转换为SSE格式
+                    const data = JSON.stringify(chunk);
+                    controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+                }
+                // 非Google客户端，添加结束标记
+                if (!isGoogleClient) {
+                    controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+                }
+                controller.close();
+            } catch (e) {
+                controller.error(e);
+            }
+        }
+    });
+
+    return new Response(stream, {
+        headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+        }
+    });
 }
 
 genai.post('/models/:fullPath', async (c) => {
@@ -30,55 +71,20 @@ genai.post('/models/:fullPath', async (c) => {
     // printLog(c);
 
     try {
-        const ai = getGeminiClient();
+        const ai = new GoogleGenAI({ apiKey: getGeminiAPIKey() });
         const body = await c.req.json();
         if (!modelName || !contentType) {
             return c.json({ error: 'Invalid path format' }, 400);
         }
-        // 生成内容
+
+        // 根据内容类型调用对应的处理函数
         if (contentType === 'generateContent') {
-            // 传递所有参数而非仅contents
-            const response = await ai.models.generateContent({
-                model: modelName,
-                ...body  // 展开所有请求参数
-            });
+            const response = await handleGenerateContent(ai, modelName, body);
             return c.json(response);
         }
-        // 流式生成内容
+
         if (contentType === 'streamGenerateContent') {
-            const result = await ai.models.generateContentStream({
-                model: modelName,
-                ...body  // 展开所有请求参数
-            });
-
-            // 使用Response对象作为流式响应
-            const encoder = new TextEncoder();
-            const stream = new ReadableStream({
-                async start(controller) {
-                    try {
-                        for await (const chunk of result) {
-                            // 将每个块转换为SSE格式
-                            const data = JSON.stringify(chunk);
-                            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-                        }
-                        // 非Google客户端，添加结束标记
-                        if (!isGoogleClient) {
-                            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-                        }
-                        controller.close();
-                    } catch (e) {
-                        controller.error(e);
-                    }
-                }
-            });
-
-            return new Response(stream, {
-                headers: {
-                    'Content-Type': 'text/event-stream',
-                    'Cache-Control': 'no-cache',
-                    'Connection': 'keep-alive'
-                }
-            });
+            return await handleStreamGenerateContent(ai, modelName, body, isGoogleClient);
         }
 
         return c.json({ error: `Unsupported content type: ${contentType}` }, 400);
