@@ -1,12 +1,8 @@
-import { GoogleGenAI } from "@google/genai";
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-
-import { geminiAuthMiddleware } from './auth';
-import getAPIKey from './get-apikey';
-import createErrorResponse from './error';
-
-import type { Context, Next } from 'hono';
+import { GoogleGenAI } from "@google/genai";
+import { getAPIKey, geminiAuthMiddleware, createErrorResponse } from './utils';
+import type { Context } from 'hono';
 
 const genai = new Hono();
 
@@ -79,7 +75,7 @@ const actionHandlers: Record<string, HandlerFunction> = {
 };
 
 // 应用认证中间件
-genai.use('/models/*', geminiAuthMiddleware);
+genai.use('/*', geminiAuthMiddleware);
 
 // 模型操作路由
 genai.post('/models/:modelAction', async (c: RequestContext) => {

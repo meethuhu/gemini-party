@@ -1,12 +1,12 @@
-import { Hono } from 'hono';
 import OpenAI from 'openai';
-import getAPIKey from './get-apikey';
-import createErrorResponse from './error';
-import { openaiAuthMiddleware } from './auth';
+import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
+import { getAPIKey, openaiAuthMiddleware, createErrorResponse } from './utils';
 import type { ChatCompletionCreateParams, ImageGenerateParams, EmbeddingCreateParams } from 'openai/resources';
 
 const oai = new Hono();
+
+oai.use('/*', openaiAuthMiddleware);
 
 const baseURL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
@@ -17,9 +17,6 @@ function getOpenAIClient() {
         baseURL: baseURL
     });
 }
-
-// 应用认证中间件
-oai.use('/*', openaiAuthMiddleware);
 
 // --- 创建聊天 ---
 oai.post('/chat/completions', async (c) => {
