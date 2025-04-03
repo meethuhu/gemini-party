@@ -13,11 +13,9 @@ function getGeminiClient(): GoogleGenAI {
 }
 
 // 打印请求信息
-function printLog(c: any) {
-    console.log(c.req.json());
-    console.log(c.req.header());
-    console.log(c.req.query());
-    console.log(c.req.param());
+async function printLog(c: any) {
+    console.log(await c.req.header());
+    console.log(await c.req.json());
 }
 
 genai.post('/models/:fullPath', async (c) => {
@@ -28,9 +26,6 @@ genai.post('/models/:fullPath', async (c) => {
 
     const client = c.req.header('x-goog-api-client') || '';
     const isGoogleClient = client.includes('genai-js');
-
-    console.log(client);
-
 
     // printLog(c);
 
