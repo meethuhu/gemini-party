@@ -27,7 +27,7 @@ genai.post('/models/:fullPath', async (c) => {
     const apiKey = c.req.header('x-goog-api-key') || c.req.query('key');
     if (!checkAuth(apiKey)) return c.json({ error: 'Invalid API key' }, 401);
 
-    printLog(c);
+    // printLog(c);
 
     try {
         const ai = getGeminiClient();
@@ -35,21 +35,20 @@ genai.post('/models/:fullPath', async (c) => {
         if (!modelName || !contentType) {
             return c.json({ error: 'Invalid path format' }, 400);
         }
-
         // 生成内容
         if (contentType === 'generateContent') {
+            // 传递所有参数而非仅contents
             const response = await ai.models.generateContent({
                 model: modelName,
-                contents: body.contents,
+                ...body  // 展开所有请求参数
             });
             return c.json(response);
         }
-
         // 流式生成内容
         if (contentType === 'streamGenerateContent') {
             const result = await ai.models.generateContentStream({
                 model: modelName,
-                contents: body.contents,
+                ...body  // 展开所有请求参数
             });
 
             // 使用Response对象作为流式响应
@@ -78,6 +77,8 @@ genai.post('/models/:fullPath', async (c) => {
                 }
             });
         }
+
+        return c.json({ error: `Unsupported content type: ${contentType}` }, 400);
 
     } catch (error: any) {
         console.error('API调用错误:', error);
