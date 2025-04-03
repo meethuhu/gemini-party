@@ -25,9 +25,7 @@ oai.post('/chat/completions', async (c) => {
     const openai = getOpenAIClient();
     const authHeader = c.req.header('authorization');
 
-    if (!authHeader || !checkAuth(authHeader)) {
-        return c.json({ error: 'Invalid API key' }, 401);
-    }
+    if (!checkAuth(authHeader)) return c.json({ error: 'Invalid API key' }, 401);
 
     try {
         // 处理流式响应
@@ -84,10 +82,7 @@ oai.get('/models', async (c) => {
     const openai = getOpenAIClient();
 
     const authHeader = c.req.header('authorization');
-
-    if (!authHeader || !checkAuth(authHeader)) {
-        return c.json({ error: 'Invalid API key' }, 401);
-    }
+    if (!checkAuth(authHeader)) return c.json({ error: 'Invalid API key' }, 401);
 
     try {
         const models = await openai.models.list();
@@ -110,9 +105,7 @@ oai.get('/models/:model', async (c) => {
 
     const authHeader = c.req.header('authorization');
 
-    if (!authHeader || !checkAuth(authHeader)) {
-        return c.json({ error: 'Invalid API key' }, 401);
-    }
+    if (!checkAuth(authHeader)) return c.json({ error: 'Invalid API key' }, 401);
 
     try {
         const model = await openai.models.retrieve(modelId);
@@ -132,9 +125,7 @@ oai.post('/images/generations', async (c) => {
     const openai = getOpenAIClient();
 
     const authHeader = c.req.header('authorization');
-    if (!authHeader || !checkAuth(authHeader)) {
-        return c.json({ error: 'Invalid API key' }, 401);
-    }
+    if (!checkAuth(authHeader)) return c.json({ error: 'Invalid API key' }, 401);
 
     try {
         const imageResponse = await openai.images.generate({
@@ -177,9 +168,7 @@ oai.post('/embeddings', async (c) => {
     const openai = getOpenAIClient();
 
     const authHeader = c.req.header('authorization');
-    if (!authHeader || !checkAuth(authHeader)) {
-        return c.json({ error: 'Invalid API key' }, 401);
-    }
+    if (!checkAuth(authHeader)) return c.json({ error: 'Invalid API key' }, 401);
 
     try {
         const embeddingResponse = await openai.embeddings.create({

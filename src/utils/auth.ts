@@ -1,14 +1,14 @@
 const AUTH_TOKEN = process.env.AUTH_TOKEN;
 
-const extractToken = (authHeader: string) => {
-    if (authHeader.startsWith('Bearer ')) {
-        return authHeader.split(' ')[1];
+const checkAuth = (authHeader: string | undefined): boolean => {
+    if (!authHeader || !AUTH_TOKEN) {
+        return false;
     }
-    return authHeader;
-}
 
-function checkAuth(authHeader: string): boolean {
-    const token = extractToken(authHeader);
+    const token = authHeader.startsWith('Bearer ')
+        ? authHeader.split(' ')[1]
+        : authHeader;
+
     return token === AUTH_TOKEN;
 }
 

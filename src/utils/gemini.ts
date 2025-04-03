@@ -4,6 +4,7 @@ import getGeminiAPIKey from './getGeminiAPIKey';
 import type { GenerateContentParameters } from '@google/genai';
 import createErrorResponse from './error';
 import checkAuth from './auth';
+
 const genai = new Hono();
 
 // Gemini客户端工厂函数
@@ -16,9 +17,7 @@ genai.post('/models/:fullPath', async (c) => {
     const [modelName, contentType] = fullPath.split(':');
     const apiKey = c.req.query('key');
 
-    if (!apiKey || !checkAuth(apiKey)) {
-        return c.json({ error: 'Invalid API key' }, 401);
-    }
+    if (!checkAuth(apiKey)) return c.json({ error: 'Invalid API key' }, 401);
 
     try {
         const ai = getGeminiClient();
