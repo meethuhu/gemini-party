@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import getAPIKey from './get-apikey';
 import createErrorResponse from './error';
 import { openaiAuthMiddleware } from './auth';
+import { streamSSE } from 'hono/streaming';
 import type { ChatCompletionCreateParams, ImageGenerateParams, EmbeddingCreateParams } from 'openai/resources';
 
 const oai = new Hono();
@@ -38,23 +39,20 @@ oai.post('/chat/completions', async (c) => {
                 stream: true,
             });
 
-            // 使用Response对象作为流式响应
-            const encoder = new TextEncoder();
-            const stream = new ReadableStream({
-                async start(controller) {
+            // 使用 Hono 的 streamSSE 进行流式处理
+            return streamSSE(c, async (stream) => {
+                try {
                     for await (const chunk of completion) {
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+                        stream.writeSSE({
+                            data: JSON.stringify(chunk)
+                        });
                     }
-                    controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-                    controller.close();
-                }
-            });
-
-            return new Response(stream, {
-                headers: {
-                    'Content-Type': 'text/event-stream',
-                    'Cache-Control': 'no-cache',
-                    'Connection': 'keep-alive'
+                    stream.writeSSE({ data: '[DONE]' });
+                } catch (error) {
+                    console.error('流式处理错误:', error);
+                    stream.writeSSE({
+                        data: JSON.stringify({ error: createErrorResponse(error) })
+                    });
                 }
             });
         }
