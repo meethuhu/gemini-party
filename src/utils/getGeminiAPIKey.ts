@@ -11,7 +11,7 @@ const getGeminiAPIKey = () => {
     counterIndex = counterIndex % geminiAPIKeys.length;
     const key = geminiAPIKeys[counterIndex];
     counterIndex++;
-    console.log(`${counterIndex}/${geminiAPIKeys.length} - ${key}`);
+    // console.log(`${counterIndex}/${geminiAPIKeys.length} - ${key}`);
 
     return key;
 }
