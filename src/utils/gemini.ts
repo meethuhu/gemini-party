@@ -4,7 +4,6 @@ import { GoogleGenAI } from "@google/genai";
 import getGeminiAPIKey from './getGeminiAPIKey';
 import createErrorResponse from './error';
 import checkAuth from './auth';
-import { logger } from 'hono/logger';
 
 const genai = new Hono();
 
@@ -26,6 +25,12 @@ genai.post('/models/:fullPath', async (c) => {
     const [modelName, contentType] = fullPath.split(':');
     const apiKey = c.req.header('x-goog-api-key') || c.req.query('key');
     if (!checkAuth(apiKey)) return c.json({ error: 'Invalid API key' }, 401);
+
+    const client = c.req.header('x-goog-api-client') || '';
+    const isGoogleClient = client.includes('genai-js');
+
+    console.log(client);
+
 
     // printLog(c);
 
@@ -61,7 +66,10 @@ genai.post('/models/:fullPath', async (c) => {
                             const data = JSON.stringify(chunk);
                             controller.enqueue(encoder.encode(`data: ${data}\n\n`));
                         }
-                        // 关闭流，不发送[DONE]标记
+                        // 非Google客户端，添加结束标记
+                        if (!isGoogleClient) {
+                            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+                        }
                         controller.close();
                     } catch (e) {
                         controller.error(e);
