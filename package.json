@@ -13,6 +13,7 @@
     "@google/genai": "^0.7.0",
     "@google/generative-ai": "^0.24.0",
     "@hono/zod-validator": "^0.4.3",
+    "chalk": "^5.4.1",
     "dotenv": "^16.4.7",
     "hono": "^4.7.5",
     "node-fetch": "^3.3.2",

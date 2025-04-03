@@ -1,31 +1,30 @@
 import { Hono } from 'hono';
 import OpenAI from 'openai';
-import getGeminiAPIKey from './getGeminiAPIKey';
-import type { ChatCompletionCreateParams, ImageGenerateParams, EmbeddingCreateParams } from 'openai/resources';
+import getAPIKey from './get-apikey';
 import createErrorResponse from './error';
-import checkAuth from './auth';
+import { openaiAuthMiddleware } from './auth';
+import type { ChatCompletionCreateParams, ImageGenerateParams, EmbeddingCreateParams } from 'openai/resources';
 
 const oai = new Hono();
 
 const baseURL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
-// OpenAI客户端工厂函数
+// OpenAI工厂
 function getOpenAIClient() {
     return new OpenAI({
-        apiKey: getGeminiAPIKey(),
+        apiKey: getAPIKey(),
         baseURL: baseURL
     });
 }
 
+// 应用认证中间件
+oai.use('/*', openaiAuthMiddleware);
 
 // --- 创建聊天 ---
 oai.post('/chat/completions', async (c) => {
     const { messages, model, tools, tool_choice, stream = false } =
         await c.req.json() as ChatCompletionCreateParams & { stream?: boolean };
     const openai = getOpenAIClient();
-    const authHeader = c.req.header('authorization');
-
-    if (!checkAuth(authHeader)) return c.json({ error: 'Invalid API key' }, 401);
 
     try {
         // 处理流式响应
@@ -81,9 +80,6 @@ oai.post('/chat/completions', async (c) => {
 oai.get('/models', async (c) => {
     const openai = getOpenAIClient();
 
-    const authHeader = c.req.header('authorization');
-    if (!checkAuth(authHeader)) return c.json({ error: 'Invalid API key' }, 401);
-
     try {
         const models = await openai.models.list();
         return c.json({
@@ -103,10 +99,6 @@ oai.get('/models/:model', async (c) => {
     const { model: modelId } = c.req.param();
     const openai = getOpenAIClient();
 
-    const authHeader = c.req.header('authorization');
-
-    if (!checkAuth(authHeader)) return c.json({ error: 'Invalid API key' }, 401);
-
     try {
         const model = await openai.models.retrieve(modelId);
         return c.json(model);
@@ -123,9 +115,6 @@ oai.post('/images/generations', async (c) => {
     const { prompt, n = 1, size, model = "imagen-3.0-generate-002", response_format = "b64_json" } =
         await c.req.json() as ImageGenerateParams;
     const openai = getOpenAIClient();
-
-    const authHeader = c.req.header('authorization');
-    if (!checkAuth(authHeader)) return c.json({ error: 'Invalid API key' }, 401);
 
     try {
         const imageResponse = await openai.images.generate({
@@ -166,9 +155,6 @@ oai.post('/embeddings', async (c) => {
     }
 
     const openai = getOpenAIClient();
-
-    const authHeader = c.req.header('authorization');
-    if (!checkAuth(authHeader)) return c.json({ error: 'Invalid API key' }, 401);
 
     try {
         const embeddingResponse = await openai.embeddings.create({

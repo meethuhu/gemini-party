@@ -7,13 +7,12 @@ if (GEMINI_API_KEY.length === 0) {
 const geminiAPIKeys = GEMINI_API_KEY;
 let counterIndex = 0;
 
-const getGeminiAPIKey = () => {
+const getAPIKey = () => {
     counterIndex = counterIndex % geminiAPIKeys.length;
     const key = geminiAPIKeys[counterIndex];
     counterIndex++;
-    // console.log(`${counterIndex}/${geminiAPIKeys.length} - ${key}`);
 
     return key;
 }
 
-export default getGeminiAPIKey;
+export default getAPIKey;
