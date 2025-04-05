@@ -10,15 +10,55 @@ const genai = new Hono();
 type RequestContext = Context;
 type HandlerFunction = (c: RequestContext, model: string) => Promise<Response>;
 
+// 操作处理器映射
+const actionHandlers: Record<string, HandlerFunction> = {
+    generateContent: handleGenerateContent,
+    generateContentStream: handleGenerateContentStream,
+    streamGenerateContent: handleGenerateContentStream,
+};
+
 // 创建Google GenAI客户端
 function getGoogleGenAIClient() {
     return new GoogleGenAI({ apiKey: getAPIKey() });
 }
 
+async function printLog(c: RequestContext, model: string, body: any) {
+    const log = {
+        url: c.req.url,
+        method: c.req.method,
+        body: body,
+    }
+    console.log(`[${model}] ${JSON.stringify(log)}`);
+}
+
+// 转换请求体格式以适应新版 genai SDK
+function convertRequestFormat(body: any) {
+    const newBody = { ...body };
+
+    // 检查是否存在顶层的 systemInstruction
+    if (newBody.systemInstruction) {
+        // 确保 config 对象存在
+        newBody.config = newBody.config || {};
+
+        // 将 systemInstruction 移动到 config 对象中
+        newBody.config.systemInstruction = newBody.systemInstruction;
+
+        // 删除顶层的 systemInstruction
+        delete newBody.systemInstruction;
+    }
+
+    return newBody;
+}
+
 // 非流式内容处理
 async function handleGenerateContent(c: RequestContext, model: string): Promise<Response> {
     const ai = getGoogleGenAIClient();
-    const body = await c.req.json();
+    const originalBody = await c.req.json();
+
+    // 转换请求体格式
+    const body = convertRequestFormat(originalBody);
+
+    printLog(c, model, body);
 
     try {
         const response = await ai.models.generateContent({
@@ -35,8 +75,14 @@ async function handleGenerateContent(c: RequestContext, model: string): Promise<
 // 流式内容处理
 async function handleGenerateContentStream(c: RequestContext, model: string): Promise<Response> {
     const ai = getGoogleGenAIClient();
-    const body = await c.req.json();
+    const originalBody = await c.req.json();
+
+    // 转换请求体格式
+    const body = convertRequestFormat(originalBody);
+
     const isGoogleClient = c.req.header('x-goog-api-client')?.includes('genai-js') || false;
+
+    printLog(c, model, body);
 
     try {
         const result = await ai.models.generateContentStream({
@@ -67,13 +113,6 @@ async function handleGenerateContentStream(c: RequestContext, model: string): Pr
     }
 }
 
-// 操作处理器映射
-const actionHandlers: Record<string, HandlerFunction> = {
-    generateContent: handleGenerateContent,
-    generateContentStream: handleGenerateContentStream,
-    streamGenerateContent: handleGenerateContentStream,
-};
-
 // 应用认证中间件
 genai.use('/*', geminiAuthMiddleware);
 
@@ -94,5 +133,24 @@ genai.post('/models/:modelAction', async (c: RequestContext) => {
 
     return handler(c, model);
 });
+
+// 获取所有模型
+genai.get('/models', async (c: RequestContext) => {
+    const API_KEY = getAPIKey();
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json() as Record<string, any>;
+    return c.json(data);
+})
+
+// 检索模型
+genai.get('/models/:model', async (c: RequestContext) => {
+    const model = c.req.param('model');
+    const API_KEY = getAPIKey();
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${API_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json() as Record<string, any>;
+    return c.json(data);
+})
 
 export default genai;
