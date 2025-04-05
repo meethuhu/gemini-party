@@ -4,7 +4,12 @@ import { GoogleGenAI } from "@google/genai";
 import { getAPIKey, geminiAuthMiddleware, createErrorResponse } from './utils';
 import type { Context } from 'hono';
 
+const IMG_MODEL = process.env.IMG_MODEL;
+
 const genai = new Hono();
+
+genai.use('/*', geminiAuthMiddleware);
+
 
 // 定义基本类型
 type RequestContext = Context;
@@ -17,11 +22,7 @@ const actionHandlers: Record<string, HandlerFunction> = {
     streamGenerateContent: handleGenerateContentStream,
 };
 
-// 创建Google GenAI客户端
-function getGoogleGenAIClient() {
-    return new GoogleGenAI({ apiKey: getAPIKey() });
-}
-
+// 打印日志
 async function printLog(c: RequestContext, model: string, body: any) {
     const log = {
         url: c.req.url,
@@ -30,6 +31,7 @@ async function printLog(c: RequestContext, model: string, body: any) {
     }
     console.log(`[${model}] ${JSON.stringify(log)}`);
 }
+
 
 // 转换请求体格式以适应新版 genai SDK
 function convertRequestFormat(model: string = '', body: any) {
@@ -58,29 +60,22 @@ function convertRequestFormat(model: string = '', body: any) {
         newBody.config = { ...newBody.config, ...newBody.generationConfig };
         delete newBody.generationConfig;
     }
-
-    if (model === 'gemini-2.0-flash-exp-image-generation') {
-        newBody.config = { ...newBody.config, responseModalities: ["Text", "Image"] };
-    }
-
     return newBody;
 }
 
 // 非流式内容处理
-async function handleGenerateContent(c: RequestContext, model: string): Promise<Response> {
-    const ai = getGoogleGenAIClient();
+async function handleGenerateContent(c: RequestContext, model: string,): Promise<Response> {
+    const ai = new GoogleGenAI({ apiKey: getAPIKey() });
     const originalBody = await c.req.json();
-
-    // 转换请求体格式
-    const body = convertRequestFormat(model,originalBody);
-
-    printLog(c, model, body);
+    // 处理 Generative AI 格式
+    const body = convertRequestFormat(model, originalBody);
 
     try {
         const response = await ai.models.generateContent({
             model,
             ...body,
         });
+
         return c.json({ response });
     } catch (error) {
         console.error('Generate content error:', error);
@@ -90,19 +85,11 @@ async function handleGenerateContent(c: RequestContext, model: string): Promise<
 
 // 流式内容处理
 async function handleGenerateContentStream(c: RequestContext, model: string): Promise<Response> {
-    const ai = getGoogleGenAIClient();
+    const ai = new GoogleGenAI({ apiKey: getAPIKey() });
     const originalBody = await c.req.json();
-
-    printLog(c, model, originalBody);
-
-    // 转换请求体格式
-    const body = convertRequestFormat(model,originalBody);
-
-    printLog(c, model, body);
-
-
     const isGoogleClient = c.req.header('x-goog-api-client')?.includes('genai-js') || false;
-
+    // 处理 Generative AI 格式
+    const body = convertRequestFormat(model, originalBody);
 
     try {
         const result = await ai.models.generateContentStream({
@@ -110,6 +97,7 @@ async function handleGenerateContentStream(c: RequestContext, model: string): Pr
             ...body,
         });
 
+        // Hono 流式响应
         return streamSSE(c, async (stream) => {
             try {
                 for await (const chunk of result) {
@@ -117,9 +105,8 @@ async function handleGenerateContentStream(c: RequestContext, model: string): Pr
                         data: JSON.stringify(chunk)
                     });
                 }
-                if (!isGoogleClient) {
-                    stream.writeSSE({ data: '[DONE]' });
-                }
+                // Google 客户端不希望收到 [DONE] 消息
+                if (!isGoogleClient) stream.writeSSE({ data: '[DONE]' });
             } catch (e) {
                 console.error('Streaming error:', e);
                 stream.writeSSE({
@@ -133,22 +120,20 @@ async function handleGenerateContentStream(c: RequestContext, model: string): Pr
     }
 }
 
-// 应用认证中间件
-genai.use('/*', geminiAuthMiddleware);
-
 // 模型操作路由
 genai.post('/models/:modelAction', async (c: RequestContext) => {
     const modelAction = c.req.param('modelAction');
+    const model: string = modelAction.split(':')[0] || '';
+    const action: string = modelAction.split(':')[1] || '';
 
-    const [model, action] = modelAction.split(':');
     if (!model || !action) {
-        return c.json({ error: 'Invalid path format. Expected format: /v1beta/models/{model}:{contentType}' }, 400);
+        return c.json({ error: 'Invalid path format. Expected format: /v1beta/models/{model}:{generateContent}' }, 400);
     }
 
     const handler = actionHandlers[action];
 
     if (!handler) {
-        return c.json({ error: 'Unsupported action' }, 400);
+        return c.json({ error: 'Invalid path format. Expected format: /v1beta/models/model:{generateContent}' }, 400);
     }
 
     return handler(c, model);
