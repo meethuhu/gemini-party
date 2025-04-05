@@ -4,12 +4,9 @@ import { GoogleGenAI } from "@google/genai";
 import { getAPIKey, geminiAuthMiddleware, createErrorResponse } from './utils';
 import type { Context } from 'hono';
 
-const IMG_MODEL = process.env.IMG_MODEL;
-
 const genai = new Hono();
 
 genai.use('/*', geminiAuthMiddleware);
-
 
 // 定义基本类型
 type RequestContext = Context;
@@ -20,41 +17,31 @@ const actionHandlers: Record<string, HandlerFunction> = {
     generateContent: handleGenerateContent,
     generateContentStream: handleGenerateContentStream,
     streamGenerateContent: handleGenerateContentStream,
+    countTokens: handleCountTokens,
 };
 
-// 打印日志
-async function printLog(c: RequestContext, model: string, body: any) {
-    const log = {
-        url: c.req.url,
-        method: c.req.method,
-        body: body,
-    }
-    console.log(`[${model}] ${JSON.stringify(log)}`);
-}
-
-
-// 转换请求体格式以适应新版 genai SDK
+// 转换请求体格式为 GenAI 接受的格式
 function convertRequestFormat(model: string = '', body: any) {
     const newBody = { ...body };
-
+    // 系统指令处理
     if (newBody.systemInstruction) {
         newBody.config = newBody.config || {};
         newBody.config.systemInstruction = newBody.systemInstruction;
         delete newBody.systemInstruction;
     }
-
+    // 安全设置处理
     if (newBody.safetySettings) {
         newBody.config = newBody.config || {};
         newBody.config.safetySettings = newBody.safetySettings;
         delete newBody.safetySettings;
     }
-
+    // 工具处理
     if (newBody.tools) {
         newBody.config = newBody.config || {};
         newBody.config.tools = newBody.tools;
         delete newBody.tools;
     }
-
+    // 配置参数处理
     if (newBody.generationConfig) {
         newBody.config = newBody.config || {};
         newBody.config = { ...newBody.config, ...newBody.generationConfig };
@@ -62,6 +49,27 @@ function convertRequestFormat(model: string = '', body: any) {
     }
     return newBody;
 }
+
+async function handleCountTokens(c: RequestContext, model: string): Promise<Response> {
+    const ai = new GoogleGenAI({ apiKey: getAPIKey() });
+    const originalBody = await c.req.json();
+    // 处理 Generative AI 格式
+    const body = convertRequestFormat(model, originalBody);
+
+    try {
+        const response = await ai.models.countTokens({
+            model,
+            ...body,
+        });
+
+        // 直接返回 API 的响应，包含 totalTokens 信息
+        return c.json(response);
+    } catch (error) {
+        console.error('Count tokens error:', error);
+        return c.json(createErrorResponse(error), 500);
+    }
+}
+
 
 // 非流式内容处理
 async function handleGenerateContent(c: RequestContext, model: string,): Promise<Response> {
@@ -120,7 +128,7 @@ async function handleGenerateContentStream(c: RequestContext, model: string): Pr
     }
 }
 
-// 模型操作路由
+// 内容生成路由
 genai.post('/models/:modelAction', async (c: RequestContext) => {
     const modelAction = c.req.param('modelAction');
     const model: string = modelAction.split(':')[0] || '';
