@@ -123,8 +123,13 @@ async function handleGenerateContentStream(c: RequestContext, model: string): Pr
     const ai = new GoogleGenAI({ apiKey: getAPIKey() });
     const originalBody = await c.req.json();
     const isGoogleClient = c.req.header('x-goog-api-client')?.includes('genai-js') || false;
+
+    console.log(JSON.stringify(originalBody));
+    
     // 处理 Generative AI 格式
     const body = convertRequestFormat(model, originalBody);
+
+    console.log(JSON.stringify(body));
 
     try {
         // 使用generateContentStream API
