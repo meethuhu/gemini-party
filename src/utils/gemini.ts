@@ -62,10 +62,7 @@ async function handleEmbedContent(c: RequestContext, model: string): Promise<Res
         const response = await ai.models.embedContent({
             model,
             contents,
-            config: {
-                taskType: body.task_type,
-                title: body.title
-            }
+            config: { ...body }
         });
 
         return c.json({
