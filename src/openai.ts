@@ -21,7 +21,7 @@ function getOpenAIClient() {
     });
 }
 
-// --- 创建聊天 ---
+// 创建聊天
 oai.post('/chat/completions', async (c) => {
     const { messages, model, tools, tool_choice, stream = false } =
         await c.req.json() as ChatCompletionCreateParams & { stream?: boolean };
@@ -74,7 +74,7 @@ oai.post('/chat/completions', async (c) => {
 })
 
 
-// --- 列出模型 ---
+// 列出模型
 oai.get('/models', async (c) => {
     const openai = getOpenAIClient();
 
@@ -92,7 +92,7 @@ oai.get('/models', async (c) => {
 })
 
 
-// --- 检索模型 ---
+// 检索模型
 oai.get('/models/:model', async (c) => {
     const { model: modelId } = c.req.param();
     const openai = getOpenAIClient();
@@ -108,7 +108,7 @@ oai.get('/models/:model', async (c) => {
 })
 
 
-// --- 生成图片 ---
+// 生成图片
 oai.post('/images/generations', async (c) => {
     const { prompt, n = 1, size, model = "imagen-3.0-generate-002", response_format = "b64_json" } =
         await c.req.json() as ImageGenerateParams;
@@ -138,7 +138,7 @@ oai.post('/images/generations', async (c) => {
 })
 
 
-// --- Embeddings ---
+// Embeddings
 oai.post('/embeddings', async (c) => {
     const { model, input, encoding_format, dimensions } =
         await c.req.json() as EmbeddingCreateParams;

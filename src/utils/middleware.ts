@@ -7,7 +7,6 @@ const AUTH_TOKEN = process.env.AUTH_TOKEN;
 function createGeminiAuthMiddleware() {
     return async function (c: Context, next: Next) {
         const reqToken = c.req.header('x-goog-api-key') || c.req.query('key');
-
         if (!AUTH_TOKEN) {
             return c.json({ error: 'AUTH_TOKEN not set correctly' }, 401);
         }
@@ -24,7 +23,7 @@ function createGeminiAuthMiddleware() {
  */
 function createOpenAIAuthMiddleware() {
     return async function (c: Context, next: Next) {
-        const token = c.req.header('orization') || '';
+        const token = c.req.header('authorization') || '';
         const reqToken = token.startsWith('Bearer ')
             ? token.split(' ')[1]
             : token;
