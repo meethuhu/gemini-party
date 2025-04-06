@@ -101,7 +101,7 @@ oai.get('/models/:model', async (c) => {
         const model = await openai.models.retrieve(modelId);
         return c.json(model);
     } catch (error: any) {
-        console.error('获取模型错误:', error);
+        console.error('检索模型错误:', error);
         const { status, body } = createErrorResponse(error);
         return c.json(body, status);
     }
