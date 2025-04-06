@@ -21,41 +21,37 @@ const actionHandlers: Record<string, HandlerFunction> = {
     embedContent: handleEmbedContent,                   // 文本嵌入向量
 };
 
+
 // 转换请求体格式为 GenAI 接受的格式
 function convertRequestFormat(model: string = '', body: any) {
+    // 防止输入非对象值
+    if (!body || typeof body !== 'object') return body;
+
     const newBody = { ...body };
-    // 系统指令处理
-    if (newBody.systemInstruction) {
-        newBody.config = newBody.config || {};
-        newBody.config.systemInstruction = newBody.systemInstruction;
-        delete newBody.systemInstruction;
+    newBody.config = newBody.config || {};
+
+    // 明确列出要移动到config的字段
+    const fieldsToMove = ['systemInstruction', 'safetySettings', 'tools', 'responseModalities'];
+
+    // 移动字段到config
+    for (const field of fieldsToMove) {
+        if (field in newBody) {
+            newBody.config[field] = newBody[field];
+            delete newBody[field];
+        }
     }
-    // 安全设置处理
-    if (newBody.safetySettings) {
-        newBody.config = newBody.config || {};
-        newBody.config.safetySettings = newBody.safetySettings;
-        delete newBody.safetySettings;
-    }
-    // 工具处理
-    if (newBody.tools) {
-        newBody.config = newBody.config || {};
-        newBody.config.tools = newBody.tools;
-        delete newBody.tools;
-    }
-    // 响应模态处理
-    if (newBody.responseModalities) {
-        newBody.config = newBody.config || {};
-        newBody.config.responseModalities = newBody.responseModalities;
-        delete newBody.responseModalities;
-    }
-    // 配置参数处理
+
+    // 特殊处理generationConfig
     if (newBody.generationConfig) {
-        newBody.config = newBody.config || {};
         newBody.config = { ...newBody.config, ...newBody.generationConfig };
         delete newBody.generationConfig;
     }
+
+    // 确保保留原始所有其他字段，特别是contents
     return newBody;
 }
+
+
 
 // 文本嵌入向量
 async function handleEmbedContent(c: RequestContext, model: string): Promise<Response> {
@@ -187,7 +183,7 @@ genai.post('/models/:modelAction', async (c: RequestContext) => {
 });
 
 // 获取所有模型
-genai.all('/models', async (c: RequestContext) => {
+genai.get('/models', async (c: RequestContext) => {
     const API_KEY = getAPIKey();
     const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
     const response = await fetch(url);
@@ -196,7 +192,7 @@ genai.all('/models', async (c: RequestContext) => {
 })
 
 // 检索模型
-genai.all('/models/:model', async (c: RequestContext) => {
+genai.get('/models/:model', async (c: RequestContext) => {
     const model = c.req.param('model');
     const API_KEY = getAPIKey();
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${API_KEY}`;
