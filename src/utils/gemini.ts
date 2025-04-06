@@ -42,6 +42,12 @@ function convertRequestFormat(model: string = '', body: any) {
         newBody.config.tools = newBody.tools;
         delete newBody.tools;
     }
+    // 响应模态处理
+    if (newBody.responseModalities) {
+        newBody.config = newBody.config || {};
+        newBody.config.responseModalities = newBody.responseModalities;
+        delete newBody.responseModalities;
+    }
     // 配置参数处理
     if (newBody.generationConfig) {
         newBody.config = newBody.config || {};
@@ -125,7 +131,7 @@ async function handleGenerateContentStream(c: RequestContext, model: string): Pr
     const isGoogleClient = c.req.header('x-goog-api-client')?.includes('genai-js') || false;
 
     console.log(JSON.stringify(originalBody));
-    
+
     // 处理 Generative AI 格式
     const body = convertRequestFormat(model, originalBody);
 

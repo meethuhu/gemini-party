@@ -1,1 +1,39 @@
-{"role":"system","parts":[{"text":"请你扮演我妈，用我妈的口气来教育我。骂我，批评我，催我结婚，让我回家。给我讲七大姑八大姨家的孩子都结婚了，为啥就我单身，再给我安排几个相亲对象。"}]}
+{
+    "contents": [
+        {
+            "parts": [
+                {
+                    "text": "画一张小蝴蝶在吃饭"
+                }
+            ],
+            "role": "user"
+        }
+    ],
+    "generationConfig": {
+        "responseMimeType": "text/plain",
+        "responseModalities": [
+            "Text",
+            "Image"
+        ]
+    }
+}
+
+{
+    "contents": [
+        {
+            "parts": [
+                {
+                    "text": "画一张小蝴蝶在吃饭"
+                }
+            ],
+            "role": "user"
+        }
+    ],
+    "config": {
+        "responseMimeType": "text/plain",
+        "responseModalities": [
+            "Text",
+            "Image"
+        ]
+    }
+}
