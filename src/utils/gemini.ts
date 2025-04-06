@@ -14,10 +14,11 @@ type HandlerFunction = (c: RequestContext, model: string) => Promise<Response>;
 
 // 操作处理器映射
 const actionHandlers: Record<string, HandlerFunction> = {
-    generateContent: handleGenerateContent,
-    generateContentStream: handleGenerateContentStream,
-    streamGenerateContent: handleGenerateContentStream,
-    countTokens: handleCountTokens,
+    generateContent: handleGenerateContent,             // 非流式内容处理
+    generateContentStream: handleGenerateContentStream, // 流式内容处理
+    streamGenerateContent: handleGenerateContentStream, // 流式内容处理
+    countTokens: handleCountTokens,                     // 计算 token 数量
+    embedContent: handleEmbedContent,                   // 文本嵌入向量
 };
 
 // 转换请求体格式为 GenAI 接受的格式
@@ -50,6 +51,32 @@ function convertRequestFormat(model: string = '', body: any) {
     return newBody;
 }
 
+// 文本嵌入向量
+async function handleEmbedContent(c: RequestContext, model: string): Promise<Response> {
+    const ai = new GoogleGenAI({ apiKey: getAPIKey() });
+    const body = await c.req.json();
+
+    const contents = body.content.parts.map((part: any) => part.text);
+
+    try {
+        const response = await ai.models.embedContent({
+            model,
+            contents,
+            config: {
+                taskType: body.task_type,
+                title: body.title
+            }
+        });
+
+        return c.json({
+            embedding: response?.embeddings?.[0] || { values: [] }
+        });
+    } catch (error) {
+        console.error('Embed content error:', error);
+        return c.json(createErrorResponse(error), 500);
+    }
+}
+
 async function handleCountTokens(c: RequestContext, model: string): Promise<Response> {
     const ai = new GoogleGenAI({ apiKey: getAPIKey() });
     const originalBody = await c.req.json();
@@ -70,13 +97,16 @@ async function handleCountTokens(c: RequestContext, model: string): Promise<Resp
     }
 }
 
-
 // 非流式内容处理
 async function handleGenerateContent(c: RequestContext, model: string,): Promise<Response> {
     const ai = new GoogleGenAI({ apiKey: getAPIKey() });
     const originalBody = await c.req.json();
+
+    console.log(JSON.stringify(originalBody));
     // 处理 Generative AI 格式
     const body = convertRequestFormat(model, originalBody);
+
+    console.log(JSON.stringify(body));
 
     try {
         const response = await ai.models.generateContent({
@@ -84,7 +114,7 @@ async function handleGenerateContent(c: RequestContext, model: string,): Promise
             ...body,
         });
 
-        return c.json({ response });
+        return c.json(response);
     } catch (error) {
         console.error('Generate content error:', error);
         return c.json(createErrorResponse(error), 500);
@@ -100,9 +130,10 @@ async function handleGenerateContentStream(c: RequestContext, model: string): Pr
     const body = convertRequestFormat(model, originalBody);
 
     try {
+        // 使用generateContentStream API
         const result = await ai.models.generateContentStream({
             model,
-            ...body,
+            ...body
         });
 
         // Hono 流式响应
