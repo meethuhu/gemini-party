@@ -1,7 +1,8 @@
 import OpenAI from 'openai';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { getAPIKey, openaiAuthMiddleware, createErrorResponse } from './utils';
+import { getAPIKey, createErrorResponse } from './utils';
+import { openaiAuthMiddleware } from './middleware'
 import type { ChatCompletionCreateParams, ImageGenerateParams, EmbeddingCreateParams } from 'openai/resources';
 
 const oai = new Hono();
