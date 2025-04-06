@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { GoogleGenAI } from "@google/genai";
-import { getAPIKey, createErrorResponse } from './utils';
-import { openaiAuthMiddleware, geminiAuthMiddleware } from './middleware'
 import type { Context } from 'hono';
+
+import { createErrorResponse } from './utils/error';
+import { getApiKey } from './utils/apikey';
+import { openaiAuthMiddleware, geminiAuthMiddleware } from './utils/middleware'
 
 const genai = new Hono();
 
@@ -201,13 +203,13 @@ genai.post('/models/:modelAction', async (c: Context) => {
     }
 
     // 执行处理函数
-    const apiKey = getAPIKey();
+    const apiKey = getApiKey();
     return handler(c, model, apiKey);
 });
 
 // 获取所有模型
 genai.get('/models', async (c: Context) => {
-    const API_KEY = getAPIKey();
+    const API_KEY = getApiKey();
     const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
     const response = await fetch(url);
     const data = await response.json() as Record<string, any>;
@@ -217,7 +219,7 @@ genai.get('/models', async (c: Context) => {
 // 检索模型
 genai.get('/models/:model', async (c: Context) => {
     const model = c.req.param('model');
-    const API_KEY = getAPIKey();
+    const API_KEY = getApiKey();
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${API_KEY}`;
     const response = await fetch(url);
     const data = await response.json() as Record<string, any>;

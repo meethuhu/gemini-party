@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import oai from './utils/openai'
-import genai from './utils/gemini'
+import oai from './openai'
+import genai from './gemini'
 
 const app = new Hono()
 

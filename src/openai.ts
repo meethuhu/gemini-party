@@ -1,9 +1,11 @@
 import OpenAI from 'openai';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { getAPIKey, createErrorResponse } from './utils';
-import { openaiAuthMiddleware } from './middleware'
 import type { ChatCompletionCreateParams, ImageGenerateParams, EmbeddingCreateParams } from 'openai/resources';
+
+import { createErrorResponse } from './utils/error';
+import { getApiKey } from './utils/apikey';
+import { openaiAuthMiddleware } from './utils/middleware'
 
 const oai = new Hono();
 
@@ -14,7 +16,7 @@ const baseURL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 // OpenAI工厂
 function getOpenAIClient() {
     return new OpenAI({
-        apiKey: getAPIKey(),
+        apiKey: getApiKey(),
         baseURL: baseURL
     });
 }
