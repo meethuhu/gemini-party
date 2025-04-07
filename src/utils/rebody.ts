@@ -22,33 +22,11 @@ export default function normalizeRequestBody(
   }
 
   // 配置字段列表
+  // 出现在顶级字段中的内容：
   const configFields: (keyof GenerateContentConfig)[] = [
-    'audioTimestamp',
-    'cachedContent',
-    'candidateCount',
-    'frequencyPenalty',
-    'httpOptions',
-    'labels',
-    'logprobs',
-    'maxOutputTokens',
-    'mediaResolution',
-    'presencePenalty',
-    'responseLogprobs',
-    'responseMimeType',
-    'responseModalities',
-    'responseSchema',
-    'routingConfig',
     'safetySettings',
-    'seed',
-    'speechConfig',
-    'stopSequences',
     'systemInstruction',
-    'temperature',
-    'thinkingConfig',
-    'toolConfig',
     'tools',
-    'topK',
-    'topP',
   ];
 
   // 提取配置并移除顶级字段
@@ -62,6 +40,12 @@ export default function normalizeRequestBody(
     }
   }
 
+  // 提取 generationConfig (如果存在)
+  const generationConfig = clonedBody.generationConfig;
+  if (generationConfig) {
+    delete clonedBody.generationConfig;
+  }
+
   // 处理安全设置
   const existingSafetySettings =
     originalBody.config?.safetySettings || extractedConfig.safetySettings;
@@ -73,7 +57,17 @@ export default function normalizeRequestBody(
     ...(originalBody.config || {}),
     // 应用处理后的安全设置
     safetySettings: processedSafetySettings,
+    // 展开 generationConfig 到 config 中
+    ...(generationConfig || {}),
   };
+
+  const loooog = {
+    model: modelName || originalBody.model,
+    contents: originalBody.contents,
+    config: finalConfig,
+  };
+
+  console.log(loooog);
 
   // 构建标准请求体
   return {
