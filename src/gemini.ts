@@ -21,7 +21,7 @@ genai.use('/model/*', geminiAuthMiddleware);
 genai.use('/openai/embeddings', openaiAuthMiddleware);
 
 // 定义基本类型
-type HandlerFunction = (c: Context, model: string, apiKey: string) => Promise<Response>;
+type HandlerFunction = (c: Context, model: string, apiKey: string, body: any) => Promise<Response>;
 
 // 操作处理器映射
 const actionHandlers: Record<string, HandlerFunction> = {
@@ -89,9 +89,8 @@ function convertRequestFormat(body: any) {
 }
 
 // Embeddings
-async function handleEmbedContent(c: Context, model: string, apiKey: string): Promise<Response> {
+async function handleEmbedContent(c: Context, model: string, apiKey: string, body: any): Promise<Response> {
     const ai = new GoogleGenAI({ apiKey: apiKey });
-    const body = await c.req.json();
     const contents = body.contents;
 
     try {
@@ -113,9 +112,8 @@ async function handleEmbedContent(c: Context, model: string, apiKey: string): Pr
 }
 
 // 计算 Token 数量
-async function handleCountTokens(c: Context, model: string, apiKey: string): Promise<Response> {
+async function handleCountTokens(c: Context, model: string, apiKey: string, originalBody: any): Promise<Response> {
     const ai = new GoogleGenAI({ apiKey: apiKey });
-    const originalBody = await c.req.json();
     const body = convertRequestFormat(originalBody);
 
     try {
@@ -133,9 +131,8 @@ async function handleCountTokens(c: Context, model: string, apiKey: string): Pro
 }
 
 // 非流式内容处理
-async function handleGenerateContent(c: Context, model: string, apiKey: string): Promise<Response> {
+async function handleGenerateContent(c: Context, model: string, apiKey: string, originalBody: any): Promise<Response> {
     const ai = new GoogleGenAI({ apiKey: apiKey });
-    const originalBody = await c.req.json();
     const body = convertRequestFormat(originalBody);
 
     try {
@@ -153,9 +150,8 @@ async function handleGenerateContent(c: Context, model: string, apiKey: string):
 }
 
 // 流式内容处理
-async function handleGenerateContentStream(c: Context, model: string, apiKey: string): Promise<Response> {
+async function handleGenerateContentStream(c: Context, model: string, apiKey: string, originalBody: any): Promise<Response> {
     const ai = new GoogleGenAI({ apiKey: apiKey });
-    const originalBody = await c.req.json();
     const isGoogleClient = c.req.header('x-goog-api-client')?.includes('genai-js') || false;
     const body = convertRequestFormat(originalBody);
     try {
@@ -210,9 +206,9 @@ genai.post('/models/:modelAction{.+:.+}', async (c: Context) => {
         }, 400);
     }
 
-    // 执行处理函数
+    const body = await c.req.json();
     const apiKey = getApiKey();
-    return handler(c, model, apiKey);
+    return handler(c, model, apiKey, body);
 });
 
 // 获取所有模型
@@ -236,7 +232,8 @@ genai.get('/models/:model', async (c: Context) => {
 
 // OpenAI 格式的 Embeddings
 genai.post('/openai/embeddings', async (c) => {
-    const { model, input, encoding_format, dimensions } = await c.req.json();
+    const body = await c.req.json();
+    const { model, input, encoding_format, dimensions } = body;
 
     if (!model || !input) {
         const errorResponse = createErrorResponse({
