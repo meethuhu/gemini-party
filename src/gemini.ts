@@ -6,7 +6,8 @@ import type { Context } from 'hono';
 
 import createErrorResponse from './utils/error';
 import { getApiKey, getDefaultKey } from './utils/apikey';
-import { openaiAuthMiddleware, geminiAuthMiddleware } from './utils/middleware'
+import { openaiAuthMiddleware, geminiAuthMiddleware } from './utils/middleware';
+import { getValidHarmSettings } from './utils/safety';
 
 const genai = new Hono();
 
@@ -22,13 +23,6 @@ const actionHandlers: Record<string, HandlerFunction> = {
     streamGenerateContent: handleGenerateContentStream, // 流式内容处理
     embedContent: handleEmbedContent,                   // 文本嵌入向量
 };
-
-// 内容过滤器 
-const HARM_CATEGORY_HARASSMENT = process.env.HARM_CATEGORY_HARASSMENT || undefined
-const HARM_CATEGORY_DANGEROUS_CONTENT = process.env.HARM_CATEGORY_DANGEROUS_CONTENT || undefined
-const HARM_CATEGORY_SEXUALLY_EXPLICIT = process.env.HARM_CATEGORY_SEXUALLY_EXPLICIT || undefined
-const HARM_CATEGORY_HATE_SPEECH = process.env.HARM_CATEGORY_HATE_SPEECH || undefined
-const HARM_CATEGORY_CIVIC_INTEGRITY = process.env.HARM_CATEGORY_CIVIC_INTEGRITY || undefined
 
 /**
  * 将收到的请求转换为 js-genai 可以接受的格式
@@ -55,59 +49,32 @@ function convertRequestFormat(body: any) {
     // 将指定字段从顶层移动到 config 对象中
     configFields.forEach(fieldName => {
         if (fieldName in formattedRequest) {
-            // 移动字段到 config 对象
             formattedRequest.config[fieldName] = formattedRequest[fieldName];
-            // 删除顶层字段
             delete formattedRequest[fieldName];
         }
     });
 
-    // 特殊处理：generationConfig 对象的内容需合并到 config 中
+    // 将 generationConfig 中的所有属性合并到 config
     if (formattedRequest.generationConfig) {
-        // 将 generationConfig 中的所有属性合并到 config
         formattedRequest.config = {
             ...formattedRequest.config,
             ...formattedRequest.generationConfig
         };
-        // 删除原 generationConfig 对象
         delete formattedRequest.generationConfig;
     }
 
-    // 如果未传入 safetySettings，则使用环境变量中的设置，构造成数组格式
-    if (!formattedRequest.config.safetySettings) {
-        formattedRequest.config.safetySettings = [
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: HARM_CATEGORY_HATE_SPEECH },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: HARM_CATEGORY_SEXUALLY_EXPLICIT },
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: HARM_CATEGORY_HARASSMENT },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: HARM_CATEGORY_DANGEROUS_CONTENT },
-            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: HARM_CATEGORY_CIVIC_INTEGRITY },
-        ];
+    // 获取有效的安全设置（优先使用环境变量，无环境变量时保留请求中的设置）
+    const validHarmSettings = getValidHarmSettings(formattedRequest.config.safetySettings);
+
+    // 如果有有效的安全设置，则使用它们
+    if (validHarmSettings.length > 0) {
+        formattedRequest.config.safetySettings = validHarmSettings;
+    } else {
+        // 如果没有有效的安全设置，则删除该属性避免发送空数组
+        delete formattedRequest.config.safetySettings;
     }
 
     return formattedRequest;
-}
-
-// Embeddings
-async function handleEmbedContent(c: Context, model: string, apiKey: string, body: any): Promise<Response> {
-    const ai = new GoogleGenAI({ apiKey: apiKey });
-    const contents = body.contents;
-
-    try {
-        const response = await ai.models.embedContent({
-            model,
-            contents,
-            config: {
-                taskType: body.task_type,
-            }
-        });
-        return c.json({
-            embedding: response?.embeddings?.[0] || { values: [] }
-        });
-    } catch (error) {
-        console.error('Embed content error:', error);
-        const { status, body: errorBody } = createErrorResponse(error);
-        return c.json(errorBody, status);
-    }
 }
 
 // 非流式内容处理
@@ -161,6 +128,29 @@ async function handleGenerateContentStream(c: Context, model: string, apiKey: st
         });
     } catch (error) {
         console.error('Generate content stream error:', error);
+        const { status, body: errorBody } = createErrorResponse(error);
+        return c.json(errorBody, status);
+    }
+}
+
+// Embeddings
+async function handleEmbedContent(c: Context, model: string, apiKey: string, body: any): Promise<Response> {
+    const ai = new GoogleGenAI({ apiKey: apiKey });
+    const contents = body.contents;
+
+    try {
+        const response = await ai.models.embedContent({
+            model,
+            contents,
+            config: {
+                taskType: body.task_type,
+            }
+        });
+        return c.json({
+            embedding: response?.embeddings?.[0] || { values: [] }
+        });
+    } catch (error) {
+        console.error('Embed content error:', error);
         const { status, body: errorBody } = createErrorResponse(error);
         return c.json(errorBody, status);
     }
