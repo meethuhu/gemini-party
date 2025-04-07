@@ -1,15 +1,28 @@
-# gemini-pool
 
-To install dependencies:
-
-```bash
-bun install
+酒馆问题没有解决
+systemInstruction parts 应该是一个数组
 ```
-
-To run:
-
-```bash
-bun run index.ts
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Hi"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "candidateCount": 1,
+    "maxOutputTokens": 4000,
+    "temperature": 1.27,
+    "topP": 1
+  },
+  "systemInstruction": {
+    "parts": {
+      "text": ""
+    }
+  }
+}
 ```
-
-This project was created using `bun init` in bun v1.2.6. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
