@@ -4,7 +4,7 @@ import { streamSSE } from 'hono/streaming';
 import type { ChatCompletionCreateParams, ImageGenerateParams, EmbeddingCreateParams } from 'openai/resources';
 
 import createErrorResponse from './utils/error';
-import { getApiKey, getDefaultKey } from './utils/apikey';
+import { getApiKey, getRotationStatus } from './utils/apikey';
 import { openaiAuthMiddleware } from './utils/middleware'
 
 const oai = new Hono();
@@ -14,9 +14,9 @@ oai.use('/*', openaiAuthMiddleware);
 const baseURL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
 // OpenAI工厂
-function getOpenAIClient() {
+function getOpenAIClient(model: string | undefined = undefined) {
     return new OpenAI({
-        apiKey: getApiKey(),
+        apiKey: getApiKey(model),
         baseURL: baseURL
     });
 }
@@ -25,7 +25,7 @@ function getOpenAIClient() {
 oai.post('/chat/completions', async (c) => {
     const { messages, model, tools, tool_choice, stream = false } =
         await c.req.json() as ChatCompletionCreateParams & { stream?: boolean };
-    const openai = getOpenAIClient();
+    const openai = getOpenAIClient(model); // 传入模型参数
 
     try {
         // 处理流式响应
@@ -91,7 +91,6 @@ oai.get('/models', async (c) => {
     }
 })
 
-
 // 检索模型
 oai.get('/models/:model', async (c) => {
     const { model: modelId } = c.req.param();
@@ -102,36 +101,6 @@ oai.get('/models/:model', async (c) => {
         return c.json(model);
     } catch (error: any) {
         console.error('检索模型错误:', error);
-        const { status, body } = createErrorResponse(error);
-        return c.json(body, status);
-    }
-})
-
-
-// 生成图片
-oai.post('/images/generations', async (c) => {
-    const { prompt, n = 1, size, model = "imagen-3.0-generate-002", response_format = "b64_json" } =
-        await c.req.json() as ImageGenerateParams;
-    const openai = getOpenAIClient();
-
-    try {
-        const imageResponse = await openai.images.generate({
-            model,
-            prompt,
-            response_format,
-            n,
-            size
-        });
-
-        const standardResponse = {
-            created: Math.floor(Date.now() / 1000),
-            data: Array.isArray(imageResponse.data) ? imageResponse.data : [],
-            object: "images"
-        };
-
-        return c.json(standardResponse);
-    } catch (error: any) {
-        console.error('生成图片错误:', error);
         const { status, body } = createErrorResponse(error);
         return c.json(body, status);
     }
@@ -152,7 +121,7 @@ oai.post('/embeddings', async (c) => {
         return c.json(errorResponse.body, errorResponse.status);
     }
 
-    const openai = getOpenAIClient();
+    const openai = getOpenAIClient(model); // 传入模型参数
 
     try {
         const embeddingResponse = await openai.embeddings.create({
@@ -170,5 +139,9 @@ oai.post('/embeddings', async (c) => {
     }
 });
 
+// 添加API密钥轮训状态监控端点
+oai.get('/api-rotation-status', async (c) => {
+
+});
 
 export default oai;

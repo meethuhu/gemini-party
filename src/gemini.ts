@@ -5,7 +5,7 @@ import { GoogleGenAI } from "@google/genai";
 import type { Context } from 'hono';
 
 import createErrorResponse from './utils/error';
-import { getApiKey, getDefaultKey } from './utils/apikey';
+import { getApiKey } from './utils/apikey';
 import { openaiAuthMiddleware, geminiAuthMiddleware } from './utils/middleware';
 import { getValidHarmSettings } from './utils/safety';
 
@@ -184,13 +184,13 @@ genai.post('/models/:modelAction{.+:.+}', async (c: Context) => {
     }
 
     const body = await c.req.json();
-    const apiKey = getApiKey();
+    const apiKey = getApiKey(model);
     return handler(c, model, apiKey, body);
 });
 
 // 获取所有模型
 genai.get('/models', async (c: Context) => {
-    const API_KEY = getDefaultKey();
+    const API_KEY = getApiKey();
     const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
     const response = await fetch(url);
     const data = await response.json() as Record<string, any>;
@@ -200,7 +200,7 @@ genai.get('/models', async (c: Context) => {
 // 检索模型
 genai.get('/models/:model', async (c: Context) => {
     const model = c.req.param('model');
-    const API_KEY = getDefaultKey();
+    const API_KEY = getApiKey();
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${API_KEY}`;
     const response = await fetch(url);
     const data = await response.json() as Record<string, any>;
@@ -222,7 +222,7 @@ genai.post('/openai/embeddings', async (c) => {
     }
 
     const openai = new OpenAI({
-        apiKey: getApiKey(),
+        apiKey: getApiKey(model),
         baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
     });
 
