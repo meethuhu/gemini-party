@@ -1,4 +1,0 @@
-openai
-hono
-@google/generative-ai
-@google/genai
