@@ -1,12 +1,12 @@
-import OpenAI from 'openai';
-import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
 import { GoogleGenAI } from "@google/genai";
+import { Hono } from 'hono';
 import type { Context } from 'hono';
+import { streamSSE } from 'hono/streaming';
+import OpenAI from 'openai';
 
-import createErrorResponse from './utils/error';
 import { getApiKey } from './utils/apikey';
-import { openaiAuthMiddleware, geminiAuthMiddleware } from './utils/middleware';
+import createErrorResponse from './utils/error';
+import { geminiAuthMiddleware, openaiAuthMiddleware } from './utils/middleware';
 import { getValidHarmSettings } from './utils/safety';
 
 const genai = new Hono();

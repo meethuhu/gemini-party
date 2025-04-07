@@ -1,17 +1,17 @@
 import { Hono } from 'hono'
-import oai from './openai'
-import genai from './gemini'
 
-import validateHarmCategories from './utils/safety'
-import createErrorResponse from './utils/error'
+import genai from './gemini'
+import oai from './openai'
 import { getRotationStatus } from './utils/apikey'
+import createErrorResponse from './utils/error'
+import validateHarmCategories from './utils/safety'
 
 const app = new Hono()
 
 // 启动时检测设置
 validateHarmCategories();
 
-// 
+// API 前缀
 const API_PREFIX: string = process.env.API_PREFIX ?? ''
 
 app.route(API_PREFIX + '/v1', oai)

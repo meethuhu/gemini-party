@@ -2,14 +2,26 @@
   "name": "gemini-pool",
   "module": "index.ts",
   "dependencies": {
-    "@google/genai": "^0.7.0",
     "hono": "^4.7.5",
-    "openai": "^4.92.0",
-    "zod": "^3.24.2"
+    "@google/genai": "^0.7.0",
+    "openai": "^4.92.0"
   },
   "peerDependencies": {
     "typescript": "^5.8.2"
   },
   "private": true,
-  "type": "module"
+  "scripts": {
+    "build": "bun build ./src/index.ts --outfile ./dist/bundle.js --target node --external hono --external openai --external @google/genai",
+    "reorder-imports": "bun scripts/reorder-imports.js",
+    "format-bundle": "prettier --write ./dist/bundle.js",
+    "build:format": "bun run build && bun run format-bundle && bun run reorder-imports"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.29.0",
+    "@typescript-eslint/parser": "^8.29.0",
+    "eslint": "^9.24.0",
+    "eslint-plugin-import": "^2.31.0",
+    "prettier": "^3.5.3"
+  }
 }
