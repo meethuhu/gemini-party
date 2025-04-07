@@ -2,8 +2,14 @@ import { Hono } from 'hono'
 import oai from './openai'
 import genai from './gemini'
 
+import validateHarmCategories from './utils/safety'
+
 const app = new Hono()
 
+// 启动时检测设置
+validateHarmCategories();
+
+// 
 const API_PREFIX: string = process.env.API_PREFIX ?? ''
 
 app.route(API_PREFIX + '/v1', oai)

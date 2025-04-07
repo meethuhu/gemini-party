@@ -3,8 +3,8 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { ChatCompletionCreateParams, ImageGenerateParams, EmbeddingCreateParams } from 'openai/resources';
 
-import { createErrorResponse } from './utils/error';
-import { getApiKey } from './utils/apikey';
+import createErrorResponse from './utils/error';
+import getApiKey from './utils/apikey';
 import { openaiAuthMiddleware } from './utils/middleware'
 
 const oai = new Hono();

@@ -22,7 +22,7 @@ const geminiApiKeys = passApiKeys();
  * 通过轮询方式从预设的密钥列表中获取一个密钥
  * @returns {string} Gemini API密钥
  */
-export function getApiKey(): string {
+export default function getApiKey(): string {
     keyRotationIndex = keyRotationIndex % geminiApiKeys.length;
     const key = geminiApiKeys[keyRotationIndex];
     keyRotationIndex++;

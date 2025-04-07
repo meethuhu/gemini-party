@@ -1,17 +1,24 @@
+import OpenAI from 'openai';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { GoogleGenAI } from "@google/genai";
-import OpenAI from 'openai';
 import type { Context } from 'hono';
 
-import { createErrorResponse } from './utils/error';
-import { getApiKey } from './utils/apikey';
+import createErrorResponse from './utils/error';
+import getApiKey from './utils/apikey';
 import { openaiAuthMiddleware, geminiAuthMiddleware } from './utils/middleware'
 
 const genai = new Hono();
 
-genai.use('/model/*', geminiAuthMiddleware);   // Gemini 格式
-genai.use('/openai/*', openaiAuthMiddleware);  // OpenAI 兼容格式
+// 内容过滤器 
+const HARM_CATEGORY_HARASSMENT = process.env.HARM_CATEGORY_HARASSMENT || undefined
+const HARM_CATEGORY_DANGEROUS_CONTENT = process.env.HARM_CATEGORY_DANGEROUS_CONTENT || undefined
+const HARM_CATEGORY_SEXUALLY_EXPLICIT = process.env.HARM_CATEGORY_SEXUALLY_EXPLICIT || undefined
+const HARM_CATEGORY_HATE_SPEECH = process.env.HARM_CATEGORY_HATE_SPEECH || undefined
+const HARM_CATEGORY_CIVIC_INTEGRITY = process.env.HARM_CATEGORY_CIVIC_INTEGRITY || undefined
+
+genai.use('/model/*', geminiAuthMiddleware);
+genai.use('/openai/embeddings', openaiAuthMiddleware);
 
 // 定义基本类型
 type HandlerFunction = (c: Context, model: string, apiKey: string) => Promise<Response>;
@@ -65,6 +72,17 @@ function convertRequestFormat(body: any) {
         };
         // 删除原 generationConfig 对象
         delete formattedRequest.generationConfig;
+    }
+
+    // 如果未传入 safetySettings，则使用环境变量中的设置，构造成数组格式
+    if (!formattedRequest.config.safetySettings) {
+        formattedRequest.config.safetySettings = [
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: HARM_CATEGORY_HATE_SPEECH },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: HARM_CATEGORY_SEXUALLY_EXPLICIT },
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: HARM_CATEGORY_HARASSMENT },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: HARM_CATEGORY_DANGEROUS_CONTENT },
+            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: HARM_CATEGORY_CIVIC_INTEGRITY },
+        ];
     }
 
     return formattedRequest;
