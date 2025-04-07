@@ -70,18 +70,18 @@ function convertRequestFormat(body: any) {
     return formattedRequest;
 }
 
-// 文本嵌入向量
+// Embeddings
 async function handleEmbedContent(c: Context, model: string, apiKey: string): Promise<Response> {
     const ai = new GoogleGenAI({ apiKey: apiKey });
     const body = await c.req.json();
-    const contents = body.content.parts.map((part: any) => part.text);
+    const contents = body.contents;
+
     try {
         const response = await ai.models.embedContent({
             model,
             contents,
             config: {
                 taskType: body.task_type,
-                title: body.title
             }
         });
         return c.json({
@@ -173,7 +173,7 @@ async function handleGenerateContentStream(c: Context, model: string, apiKey: st
 }
 
 // 内容生成路由
-genai.post('/models/:modelAction', async (c: Context) => {
+genai.post('/models/:modelAction{.+:.+}', async (c: Context) => {
     const modelAction = c.req.param('modelAction');
     const [model, action] = modelAction.split(':');
 
@@ -218,8 +218,7 @@ genai.get('/models/:model', async (c: Context) => {
 
 // OpenAI 格式的 Embeddings
 genai.post('/openai/embeddings', async (c) => {
-    const { model, input, encoding_format, dimensions } =
-        await c.req.json();
+    const { model, input, encoding_format, dimensions } = await c.req.json();
 
     if (!model || !input) {
         const errorResponse = createErrorResponse({
