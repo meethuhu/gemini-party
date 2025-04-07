@@ -10,13 +10,6 @@ import { openaiAuthMiddleware, geminiAuthMiddleware } from './utils/middleware'
 
 const genai = new Hono();
 
-// 内容过滤器 
-const HARM_CATEGORY_HARASSMENT = process.env.HARM_CATEGORY_HARASSMENT || undefined
-const HARM_CATEGORY_DANGEROUS_CONTENT = process.env.HARM_CATEGORY_DANGEROUS_CONTENT || undefined
-const HARM_CATEGORY_SEXUALLY_EXPLICIT = process.env.HARM_CATEGORY_SEXUALLY_EXPLICIT || undefined
-const HARM_CATEGORY_HATE_SPEECH = process.env.HARM_CATEGORY_HATE_SPEECH || undefined
-const HARM_CATEGORY_CIVIC_INTEGRITY = process.env.HARM_CATEGORY_CIVIC_INTEGRITY || undefined
-
 genai.use('/model/*', geminiAuthMiddleware);
 genai.use('/openai/embeddings', openaiAuthMiddleware);
 
@@ -29,6 +22,13 @@ const actionHandlers: Record<string, HandlerFunction> = {
     streamGenerateContent: handleGenerateContentStream, // 流式内容处理
     embedContent: handleEmbedContent,                   // 文本嵌入向量
 };
+
+// 内容过滤器 
+const HARM_CATEGORY_HARASSMENT = process.env.HARM_CATEGORY_HARASSMENT || undefined
+const HARM_CATEGORY_DANGEROUS_CONTENT = process.env.HARM_CATEGORY_DANGEROUS_CONTENT || undefined
+const HARM_CATEGORY_SEXUALLY_EXPLICIT = process.env.HARM_CATEGORY_SEXUALLY_EXPLICIT || undefined
+const HARM_CATEGORY_HATE_SPEECH = process.env.HARM_CATEGORY_HATE_SPEECH || undefined
+const HARM_CATEGORY_CIVIC_INTEGRITY = process.env.HARM_CATEGORY_CIVIC_INTEGRITY || undefined
 
 /**
  * 将收到的请求转换为 js-genai 可以接受的格式
@@ -173,17 +173,24 @@ genai.post('/models/:modelAction{.+:.+}', async (c: Context) => {
 
     // 验证模型和操作是否存在
     if (!model || !action) {
-        return c.json({
-            error: '无效的请求路径格式，预期格式: /v1beta/models/{model}:{action}'
-        }, 400);
+        const errorResponse = createErrorResponse({
+            message: "无效的请求路径格式，预期格式: /v1beta/models/{model}:{action}",
+            type: "invalid_request_error",
+            status: 400
+        });
+        return c.json(errorResponse.body, errorResponse.status);
     }
 
     // 获取对应的处理函数
     const handler = actionHandlers[action];
+
     if (!handler) {
-        return c.json({
-            error: `不支持的操作: ${action}`
-        }, 400);
+        const errorResponse = createErrorResponse({
+            message: "不支持的操作: ${action}",
+            type: "invalid_request_error",
+            status: 400
+        });
+        return c.json(errorResponse.body, errorResponse.status);
     }
 
     const body = await c.req.json();
