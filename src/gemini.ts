@@ -27,7 +27,6 @@ type HandlerFunction = (c: Context, model: string, apiKey: string, body: any) =>
 const actionHandlers: Record<string, HandlerFunction> = {
     generateContent: handleGenerateContent,             // 非流式内容处理
     streamGenerateContent: handleGenerateContentStream, // 流式内容处理
-    countTokens: handleCountTokens,                     // 计算 token 数量
     embedContent: handleEmbedContent,                   // 文本嵌入向量
 };
 
@@ -106,25 +105,6 @@ async function handleEmbedContent(c: Context, model: string, apiKey: string, bod
         });
     } catch (error) {
         console.error('Embed content error:', error);
-        const { status, body: errorBody } = createErrorResponse(error);
-        return c.json(errorBody, status);
-    }
-}
-
-// 计算 Token 数量
-async function handleCountTokens(c: Context, model: string, apiKey: string, originalBody: any): Promise<Response> {
-    const ai = new GoogleGenAI({ apiKey: apiKey });
-    const body = convertRequestFormat(originalBody);
-
-    try {
-        const response = await ai.models.countTokens({
-            model,
-            ...body,
-        });
-
-        return c.json(response);
-    } catch (error) {
-        console.error('Count tokens error:', error);
         const { status, body: errorBody } = createErrorResponse(error);
         return c.json(errorBody, status);
     }
