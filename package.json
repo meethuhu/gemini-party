@@ -4,11 +4,11 @@
   "dependencies": {
     "@google/genai": "^0.7.0",
     "hono": "^4.7.5",
-    "openai": "^4.91.1",
+    "openai": "^4.92.0",
     "zod": "^3.24.2"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^5.8.2"
   },
   "private": true,
   "type": "module"
