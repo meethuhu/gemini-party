@@ -206,7 +206,7 @@ genai.post('/models/:modelAction{.+:.+}', async (c: Context) => {
     const handler = actionHandlers[action];
     if (!handler) {
         return c.json({
-            error: `不支持的操作: ${action}}`
+            error: `不支持的操作: ${action}`
         }, 400);
     }
 
