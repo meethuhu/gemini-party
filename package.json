@@ -1,20 +1,18 @@
 {
-  "name": "gemini-pool",
+  "name": "gemini-party",
   "module": "index.ts",
   "dependencies": {
     "hono": "^4.7.5",
     "@google/genai": "^0.7.0",
-    "openai": "^4.92.0"
+    "openai": "^4.92.1"
   },
   "peerDependencies": {
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.3"
   },
   "private": true,
   "scripts": {
-    "build": "bun build ./src/index.ts --outfile ./dist/bundle.js --target node --external hono --external openai --external @google/genai",
-    "reorder-imports": "bun scripts/reorder-imports.js",
-    "format-bundle": "prettier --write ./dist/bundle.js",
-    "build:format": "bun run build && bun run format-bundle && bun run reorder-imports"
+    "run": "bun ./src/index.ts",
+    "docker-build": "docker build --pull -t genzilla ."
   },
   "type": "module",
   "devDependencies": {

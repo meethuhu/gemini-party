@@ -1,5 +1,8 @@
-import type { GenerateContentParameters, GenerateContentConfig } from '@google/genai';
-import { getValidHarmSettings } from './safety';
+import type {
+  GenerateContentParameters,
+  GenerateContentConfig,
+} from "@google/genai";
+import { getValidHarmSettings } from "./safety";
 
 /**
  * 规范化请求体为Google GenAI API所需格式
@@ -16,7 +19,9 @@ export default function normalizeRequestBody(
   if (
     originalBody.model &&
     originalBody.contents &&
-    (originalBody.config || originalBody.config === null || originalBody.config === undefined)
+    (originalBody.config ||
+      originalBody.config === null ||
+      originalBody.config === undefined)
   ) {
     return originalBody as GenerateContentParameters;
   }
@@ -24,9 +29,9 @@ export default function normalizeRequestBody(
   // 配置字段列表
   // 出现在顶级字段中的内容：
   const configFields: (keyof GenerateContentConfig)[] = [
-    'safetySettings',
-    'systemInstruction',
-    'tools',
+    "safetySettings",
+    "systemInstruction",
+    "tools",
   ];
 
   // 提取配置并移除顶级字段
@@ -61,22 +66,13 @@ export default function normalizeRequestBody(
     safetySettings: processedSafetySettings,
   };
 
-  // 调试模式
-  // looog(modelName, originalBody, finalConfig);
-
-  // 构建标准请求体
-  return {
+  // 构建标准结构
+  const newBody = {
     model: modelName || originalBody.model,
     contents: originalBody.contents,
     config: finalConfig,
   };
-}
 
-function looog(modelName: any, originalBody: any, finalConfig: any) {
-  const loooog = {
-    model: modelName || originalBody.model,
-    contents: originalBody.contents,
-    config: finalConfig,
-  };
-  console.log(loooog);
+  // console.log(`NewBody:${JSON.stringify(newBody, null, 2)}`);
+  return newBody;
 }
