@@ -76,7 +76,7 @@ async function handleGenerateContentStream(c: Context, model: string, // 添加m
 // Embeddings
 async function handleEmbedContent(c: Context, model: string, apiKey: string, body: any): Promise<Response> {
     const ai = new GoogleGenAI({ apiKey: apiKey });
-    const contents = body.contents;
+    const contents = body.content;
 
     try {
         const response = await ai.models.embedContent({
