@@ -1,12 +1,12 @@
-import {GoogleGenAI} from '@google/genai';
-import type {Context} from 'hono';
-import {Hono} from 'hono';
-import {streamSSE} from 'hono/streaming';
+import { GoogleGenAI } from '@google/genai';
+import type { Context } from 'hono';
+import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import OpenAI from 'openai';
 
-import {getApiKey} from '../utils/apikey.ts';
-import {createErrorResponse, createHonoErrorResponse} from '../utils/error';
-import {geminiAuthMiddleware, openaiAuthMiddleware} from '../utils/middleware';
+import { getApiKey } from '../utils/apikey.ts';
+import { createErrorResponse, createHonoErrorResponse } from '../utils/error';
+import { geminiAuthMiddleware, openaiAuthMiddleware } from '../utils/middleware';
 import normalizeRequestBody from '../utils/rebody';
 
 const genai = new Hono();
@@ -26,7 +26,7 @@ const actionHandlers: Record<string, HandlerFunction> = {
 
 // 非流式内容处理
 async function handleGenerateContent(c: Context, model: string, apiKey: string, originalBody: any): Promise<Response> {
-    const ai = new GoogleGenAI({apiKey: apiKey});
+    const ai = new GoogleGenAI({ apiKey: apiKey });
     const body = normalizeRequestBody(originalBody, model);
 
     try {
@@ -43,8 +43,8 @@ async function handleGenerateContent(c: Context, model: string, apiKey: string, 
 
 // 流式内容处理
 async function handleGenerateContentStream(c: Context, model: string, // 添加model参数
-                                           apiKey: string, originalBody: any): Promise<Response> {
-    const ai = new GoogleGenAI({apiKey: apiKey});
+    apiKey: string, originalBody: any): Promise<Response> {
+    const ai = new GoogleGenAI({ apiKey: apiKey });
     const isGoogleClient = c.req.header('x-goog-api-client')?.includes('genai-js') || false;
     const body = normalizeRequestBody(originalBody, model); // 传入model参数
     try {
@@ -59,13 +59,10 @@ async function handleGenerateContentStream(c: Context, model: string, // 添加m
                         data: JSON.stringify(chunk),
                     });
                 }
-                // Google 客户端不希望收到 [DONE] 消息
-                if (!isGoogleClient) {
-                    await stream.writeSSE({data: '[DONE]'});
-                }
+                // Gemini 流式响应不应包含 [DONE] 消息
             } catch (e) {
                 console.error('Streaming error:', e);
-                const {body} = createErrorResponse(e);
+                const { body } = createErrorResponse(e);
                 await stream.writeSSE({
                     data: JSON.stringify(body),
                 });
@@ -79,7 +76,7 @@ async function handleGenerateContentStream(c: Context, model: string, // 添加m
 
 // Embeddings
 async function handleEmbedContent(c: Context, model: string, apiKey: string, body: any): Promise<Response> {
-    const ai = new GoogleGenAI({apiKey: apiKey});
+    const ai = new GoogleGenAI({ apiKey: apiKey });
     const contents = body.contents;
 
     try {
@@ -89,7 +86,7 @@ async function handleEmbedContent(c: Context, model: string, apiKey: string, bod
             },
         });
         return c.json({
-            embedding: response?.embeddings?.[0] || {values: []},
+            embedding: response?.embeddings?.[0] || { values: [] },
         });
     } catch (error) {
         console.error('Embed content error:', error);
@@ -149,7 +146,7 @@ genai.get('/models/:model', async (c: Context) => {
 // OpenAI 格式的 Embeddings
 genai.post('/openai/embeddings', async (c) => {
     const body = await c.req.json();
-    const {model, input, encoding_format, dimensions} = body;
+    const { model, input, encoding_format, dimensions } = body;
 
     if (!model || !input) {
         return createHonoErrorResponse(c, {
@@ -164,7 +161,7 @@ genai.post('/openai/embeddings', async (c) => {
     try {
         const embeddingResponse = await openai.embeddings.create({
             model: model,
-            input: input, ...(encoding_format && {encoding_format: encoding_format}), ...(dimensions && {dimensions: dimensions}),
+            input: input, ...(encoding_format && { encoding_format: encoding_format }), ...(dimensions && { dimensions: dimensions }),
         });
 
         return c.json(embeddingResponse);
