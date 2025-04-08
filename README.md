@@ -5,7 +5,7 @@ Gemini Party 是一个基于 [Hono](https://github.com/honojs/hono) 的轻量级
 
 ## 📚 接口说明
 
-### <img src="public/gemini.svg" alt="gemini-icon" width="20" style="transform: translateY(.2rem)"> Gemini 原生格式
+### <img src="public/gemini.svg" alt="gemini-icon" width="20" style="transform: translateY(.3rem)"> Gemini 原生格式
 
 - `POST /v1beta/models/{model}:generateContent` - 生成内容
 - `POST /v1beta/models/{model}:streamGenerateContent` - 流式生成内容
@@ -14,7 +14,7 @@ Gemini Party 是一个基于 [Hono](https://github.com/honojs/hono) 的轻量级
 - `GET  /v1beta/models` - 获取模型列表
 - `GET  /v1beta/models/{model}` - 获取特定模型信息
 
-### <img src="public/openai.svg" alt="openai-icon" width="20" style="transform: translateY(.2rem)"> OpenAI 兼容格式
+### <img src="public/openai.svg" alt="openai-icon" width="20" style="transform: translateY(.3rem)"> OpenAI 兼容格式
 
 对于 OpenAI 格式的请求使用 `OpenAI SDK`，但是Google对于OpenAI格式的支持仍处于Beta阶段，所有有些功能无法实现，比如 Safety settings 和 Gemini 2.0 Flash 的图文生成，
 
@@ -178,3 +178,4 @@ gemini-pool/
 ```
 
 ## 📄 开源许可
+[MIT LICENSE](/LICENSE)
