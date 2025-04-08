@@ -55,7 +55,7 @@ bun start
 docker build -t gemini-party .
 
 # 运行容器
-docker run -d -p 2333:2333 --env-file .env --name gemini-party gemini-party
+docker run -d -p 2333:3000 --env-file .env --name gemini-party gemini-party
 ```
 
 ## ⚙️ 环境变量
