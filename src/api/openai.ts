@@ -4,7 +4,7 @@ import OpenAI from 'openai';
 import type {ChatCompletionCreateParams, EmbeddingCreateParams} from 'openai/resources';
 
 import {getApiKey} from '../utils/apikey';
-import createErrorResponse from '../utils/error';
+import { createHonoErrorResponse, createErrorResponse } from '../utils/error';
 import {openaiAuthMiddleware} from '../utils/middleware'
 
 const oai = new Hono();
@@ -46,8 +46,9 @@ oai.post('/chat/completions', async (c) => {
                     await stream.writeSSE({data: '[DONE]'});
                 } catch (error) {
                     console.error('流式处理错误:', error);
+                    const { body } = createErrorResponse(error);
                     await stream.writeSSE({
-                        data: JSON.stringify({error: createErrorResponse(error)})
+                        data: JSON.stringify(body)
                     });
                 }
             });
@@ -61,11 +62,9 @@ oai.post('/chat/completions', async (c) => {
         return c.json(response);
     } catch (error: any) {
         console.error('API调用错误:', error);
-        const {status, body} = createErrorResponse(error);
-        return c.json(body, status);
+        return createHonoErrorResponse(c, error);
     }
 })
-
 
 // 列出模型
 oai.get('/models', async (c) => {
@@ -78,8 +77,7 @@ oai.get('/models', async (c) => {
         });
     } catch (error: any) {
         console.error('获取模型错误:', error);
-        const {status, body} = createErrorResponse(error);
-        return c.json(body, status);
+        return createHonoErrorResponse(c, error);
     }
 })
 
@@ -93,21 +91,18 @@ oai.get('/models/:model', async (c) => {
         return c.json(model);
     } catch (error: any) {
         console.error('检索模型错误:', error);
-        const {status, body} = createErrorResponse(error);
-        return c.json(body, status);
+        return createHonoErrorResponse(c, error);
     }
 })
-
 
 // Embeddings
 oai.post('/embeddings', async (c) => {
     const {model, input, encoding_format, dimensions} = await c.req.json() as EmbeddingCreateParams;
 
     if (!model || !input) {
-        const errorResponse = createErrorResponse({
+        return createHonoErrorResponse(c, {
             message: "请求体必须包含 'model' 和 'input' 参数。", type: "invalid_request_error", status: 400
         });
-        return c.json(errorResponse.body, errorResponse.status);
     }
 
     const openai = getOpenAIClient(model); // 传入模型参数
@@ -121,9 +116,7 @@ oai.post('/embeddings', async (c) => {
         return c.json(embeddingResponse);
     } catch (error: any) {
         console.error('创建 Embeddings 时出错:', error);
-
-        const {status, body} = createErrorResponse(error);
-        return c.json(body, status);
+        return createHonoErrorResponse(c, error);
     }
 });
 

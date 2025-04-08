@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import genai from "./api/gemini";
 import oai from "./api/openai";
 import { getRotationStatus } from "./utils/apikey";
-import createErrorResponse from "./utils/error";
+import { createHonoErrorResponse } from "./utils/error";
 import validateHarmCategories from "./utils/safety";
 import { config } from './utils/config';
 
@@ -26,8 +26,7 @@ app.get("/info", async (c) => {
         });
     } catch (error: any) {
         console.error("获取轮训状态错误:", error);
-        const { status, body } = createErrorResponse(error);
-        return c.json(body, status);
+        return createHonoErrorResponse(c, error);
     }
 });
 
