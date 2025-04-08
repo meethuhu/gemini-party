@@ -1,5 +1,5 @@
-import type { Context, Next } from 'hono';
-import { config } from './config';
+import type {Context, Next} from 'hono';
+import {config} from './config';
 
 const AUTH_TOKEN = config.api.AUTH_TOKEN;
 
@@ -9,13 +9,14 @@ const AUTH_TOKEN = config.api.AUTH_TOKEN;
 function createGeminiAuthMiddleware() {
     return async function (c: Context, next: Next) {
         const reqToken = c.req.header('x-goog-api-key') || c.req.query('key');
+
         if (!AUTH_TOKEN) {
-            return c.json({ error: 'AUTH_TOKEN not set correctly' }, 401);
+            return c.json({error: 'AUTH_TOKEN not set correctly'}, 401);
+        }
+        if (AUTH_TOKEN !== reqToken) {
+            return c.json({error: 'Invalid API key'}, 401);
         }
 
-        if (AUTH_TOKEN !== reqToken) {
-            return c.json({ error: 'Invalid API key' }, 401);
-        }
         await next();
     }
 }
@@ -29,12 +30,12 @@ function createOpenAIAuthMiddleware() {
         const reqToken = token.startsWith('Bearer ') ? token.split(' ')[1] : token;
 
         if (!AUTH_TOKEN) {
-            return c.json({ error: 'AUTH_TOKEN not set correctly' }, 401);
+            return c.json({error: 'AUTH_TOKEN not set correctly'}, 401);
+        }
+        if (AUTH_TOKEN !== reqToken) {
+            return c.json({error: 'Invalid API key'}, 401);
         }
 
-        if (AUTH_TOKEN !== reqToken) {
-            return c.json({ error: 'Invalid API key' }, 401);
-        }
         await next();
     }
 }

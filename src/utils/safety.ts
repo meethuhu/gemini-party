@@ -1,5 +1,5 @@
-import type { SafetySetting, HarmBlockThreshold, HarmCategory } from '@google/genai';
-import { config } from './config';
+import type {HarmBlockThreshold, HarmCategory, SafetySetting} from '@google/genai';
+import {config} from './config';
 
 // 验证内容过滤器设置
 const VALID_HARM_THRESHOLDS: string[] = [
@@ -9,9 +9,6 @@ const VALID_HARM_THRESHOLDS: string[] = [
     'BLOCK_LOW_AND_ABOVE',
     'HARM_BLOCK_THRESHOLD_UNSPECIFIED'
 ];
-
-export type ConfigHarmCategory = keyof typeof config.safety;
-export type HarmThreshold = typeof VALID_HARM_THRESHOLDS[number];
 
 /**
  * 获取有效的安全设置

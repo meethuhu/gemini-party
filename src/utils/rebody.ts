@@ -1,23 +1,17 @@
-import type { GenerateContentConfig, GenerateContentParameters, ContentListUnion } from "@google/genai";
-import { getValidHarmSettings } from "./safety";
+import type {ContentListUnion, GenerateContentConfig, GenerateContentParameters} from "@google/genai";
+import {getValidHarmSettings} from "./safety";
 
 // 配置字段定义
 const CONFIG_FIELDS = {
-    safetySettings: true,
-    systemInstruction: true,
-    tools: true
+    safetySettings: true, systemInstruction: true, tools: true
 } as const;
-
-type ConfigField = keyof typeof CONFIG_FIELDS;
 
 /**
  * 从请求体中提取配置字段
  */
 function extractConfigFields(body: Record<string, unknown>): Partial<GenerateContentConfig> {
-    return Object.fromEntries(
-        Object.entries(body)
-            .filter(([key]) => key in CONFIG_FIELDS)
-    ) as Partial<GenerateContentConfig>;
+    return Object.fromEntries(Object.entries(body)
+        .filter(([key]) => key in CONFIG_FIELDS)) as Partial<GenerateContentConfig>;
 }
 
 /**
@@ -37,10 +31,7 @@ function validateRequestBody(body: Record<string, unknown>): void {
  * @returns 规范化的请求参数
  * @throws 如果请求体缺少必要字段
  */
-export default function normalizeRequestBody(
-    originalBody: Partial<GenerateContentParameters> & Record<string, unknown>,
-    modelName: string
-): GenerateContentParameters {
+export default function normalizeRequestBody(originalBody: Partial<GenerateContentParameters> & Record<string, unknown>, modelName: string): GenerateContentParameters {
     validateRequestBody(originalBody);
 
     // 已符合规格的请求直接返回
@@ -49,11 +40,11 @@ export default function normalizeRequestBody(
     }
 
     // 克隆请求体以避免修改原始对象
-    const clonedBody = { ...originalBody };
+    const clonedBody = {...originalBody};
 
     // 提取配置字段
     const extractedConfig = extractConfigFields(clonedBody);
-    
+
     // 移除已提取的配置字段
     Object.keys(CONFIG_FIELDS).forEach(key => {
         delete clonedBody[key];
@@ -69,9 +60,7 @@ export default function normalizeRequestBody(
 
     // 合并配置
     const finalConfig: GenerateContentConfig = {
-        ...extractedConfig,
-        ...(originalBody.config || {}),
-        ...(generationConfig || {}),
+        ...extractedConfig, ...(originalBody.config || {}), ...(generationConfig || {}),
         safetySettings: processedSafetySettings,
     };
 

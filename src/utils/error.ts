@@ -1,6 +1,6 @@
-import { APIError } from 'openai';
-import type { Context } from 'hono';
-import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import {APIError} from 'openai';
+import type {Context} from 'hono';
+import type {ContentfulStatusCode} from 'hono/utils/http-status';
 
 // 错误类型定义
 export enum ErrorType {
@@ -62,9 +62,7 @@ function extractErrorInfo(error: unknown): StandardError {
 
     if (error instanceof Error) {
         return {
-            message: error.message,
-            type: ErrorType.UNKNOWN,
-            code: 'error'
+            message: error.message, type: ErrorType.UNKNOWN, code: 'error'
         };
     }
 
@@ -80,8 +78,7 @@ function extractErrorInfo(error: unknown): StandardError {
     }
 
     return {
-        message: ERROR_MESSAGES[ErrorType.UNKNOWN],
-        type: ErrorType.UNKNOWN
+        message: ERROR_MESSAGES[ErrorType.UNKNOWN], type: ErrorType.UNKNOWN
     };
 }
 
@@ -104,17 +101,16 @@ function getErrorStatus(error: unknown): ContentfulStatusCode {
 
 /**
  * 创建标准化的错误响应
- * 
+ *
  * @param error 错误对象
  * @returns 标准化的错误响应
  */
 export function createErrorResponse(error: unknown): ErrorResponse {
     const status = getErrorStatus(error);
     const errorInfo = extractErrorInfo(error);
-    
+
     return {
-        status,
-        body: {
+        status, body: {
             error: errorInfo
         }
     };
@@ -122,12 +118,12 @@ export function createErrorResponse(error: unknown): ErrorResponse {
 
 /**
  * 创建 Hono 兼容的错误响应
- * 
+ *
  * @param c Hono 上下文
  * @param error 错误对象
  * @returns Hono 响应
  */
 export function createHonoErrorResponse(c: Context, error: unknown) {
-    const { status, body } = createErrorResponse(error);
+    const {status, body} = createErrorResponse(error);
     return c.json(body, status);
 }

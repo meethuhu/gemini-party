@@ -3,8 +3,8 @@ import {streamSSE} from 'hono/streaming';
 import OpenAI from 'openai';
 import type {ChatCompletionCreateParams, EmbeddingCreateParams} from 'openai/resources';
 
-import {getApiKey} from '../utils/apikey';
-import { createHonoErrorResponse, createErrorResponse } from '../utils/error';
+import {getApiKey} from '../utils/apikey.ts';
+import {createErrorResponse, createHonoErrorResponse} from '../utils/error';
 import {openaiAuthMiddleware} from '../utils/middleware'
 
 const oai = new Hono();
@@ -14,9 +14,9 @@ oai.use('/*', openaiAuthMiddleware);
 const baseURL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
 // OpenAI工厂
-function getOpenAIClient(model: string | undefined = undefined) {
+async function getOpenAIClient(model: string | undefined = undefined) {
     return new OpenAI({
-        apiKey: getApiKey(model), baseURL: baseURL
+        apiKey: await getApiKey(model), baseURL: baseURL
     });
 }
 
@@ -25,7 +25,7 @@ oai.post('/chat/completions', async (c) => {
     const {messages, model, tools, tool_choice, stream = false} = await c.req.json() as ChatCompletionCreateParams & {
         stream?: boolean
     };
-    const openai = getOpenAIClient(model); // 传入模型参数
+    const openai = await getOpenAIClient(model); // 传入模型参数
 
     try {
         // 处理流式响应
@@ -46,7 +46,7 @@ oai.post('/chat/completions', async (c) => {
                     await stream.writeSSE({data: '[DONE]'});
                 } catch (error) {
                     console.error('流式处理错误:', error);
-                    const { body } = createErrorResponse(error);
+                    const {body} = createErrorResponse(error);
                     await stream.writeSSE({
                         data: JSON.stringify(body)
                     });
@@ -68,7 +68,7 @@ oai.post('/chat/completions', async (c) => {
 
 // 列出模型
 oai.get('/models', async (c) => {
-    const openai = getOpenAIClient();
+    const openai = await getOpenAIClient();
 
     try {
         const models = await openai.models.list();
@@ -84,7 +84,7 @@ oai.get('/models', async (c) => {
 // 检索模型
 oai.get('/models/:model', async (c) => {
     const {model: modelId} = c.req.param();
-    const openai = getOpenAIClient();
+    const openai = await getOpenAIClient();
 
     try {
         const model = await openai.models.retrieve(modelId);
@@ -105,7 +105,7 @@ oai.post('/embeddings', async (c) => {
         });
     }
 
-    const openai = getOpenAIClient(model); // 传入模型参数
+    const openai = await getOpenAIClient(model); // 传入模型参数
 
     try {
         const embeddingResponse = await openai.embeddings.create({
