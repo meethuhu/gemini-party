@@ -104,6 +104,8 @@ async function handleEmbedContent(
       contents,
       config: {
         taskType: body.task_type,
+        title: body.title,
+        outputDimensionality: body.outputDimensionality,
       },
     });
     return c.json({

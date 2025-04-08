@@ -55,19 +55,14 @@ export default function normalizeRequestBody(
   const finalConfig: GenerateContentConfig = {
     ...extractedConfig,
     ...(originalBody.config || {}),
-    // 应用处理后的安全设置
-    safetySettings: processedSafetySettings,
     // 展开 generationConfig 到 config 中
     ...(generationConfig || {}),
+    // 应用处理后的安全设置
+    safetySettings: processedSafetySettings,
   };
 
-  const loooog = {
-    model: modelName || originalBody.model,
-    contents: originalBody.contents,
-    config: finalConfig,
-  };
-
-  console.log(loooog);
+  // 调试模式
+  looog(modelName, originalBody, finalConfig);
 
   // 构建标准请求体
   return {
@@ -75,4 +70,13 @@ export default function normalizeRequestBody(
     contents: originalBody.contents,
     config: finalConfig,
   };
+}
+
+function looog(modelName: any, originalBody: any, finalConfig: any) {
+  const loooog = {
+    model: modelName || originalBody.model,
+    contents: originalBody.contents,
+    config: finalConfig,
+  };
+  console.log(loooog);
 }
