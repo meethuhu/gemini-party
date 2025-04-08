@@ -1,4 +1,4 @@
-import type { SafetySetting } from '@google/genai';
+import type {SafetySetting} from '@google/genai';
 
 // 内容过滤器 - 从环境变量读取配置
 const HARM_CATEGORY_HARASSMENT = process.env.HARM_CATEGORY_HARASSMENT || undefined;
@@ -8,18 +8,12 @@ const HARM_CATEGORY_HATE_SPEECH = process.env.HARM_CATEGORY_HATE_SPEECH || undef
 const HARM_CATEGORY_CIVIC_INTEGRITY = process.env.HARM_CATEGORY_CIVIC_INTEGRITY || undefined;
 
 // 验证内容过滤器设置
-const VALID_HARM_THRESHOLDS: string[] = [
-    'BLOCK_NONE',
-    'BLOCK_ONLY_HIGH',
-    'BLOCK_MEDIUM_AND_ABOVE',
-    'BLOCK_LOW_AND_ABOVE',
-    'HARM_BLOCK_THRESHOLD_UNSPECIFIED'
-];
+const VALID_HARM_THRESHOLDS: string[] = ['BLOCK_NONE', 'BLOCK_ONLY_HIGH', 'BLOCK_MEDIUM_AND_ABOVE', 'BLOCK_LOW_AND_ABOVE', 'HARM_BLOCK_THRESHOLD_UNSPECIFIED'];
 
 /**
  * 获取有效的安全设置
  * 优先使用环境变量中的设置，如果环境变量未设置，则保留请求中的原有设置
- * 
+ *
  * @param requestSafetySettings - 请求体中的安全设置
  * @returns 有效的安全设置数组
  */
@@ -38,15 +32,15 @@ export function getValidHarmSettings(requestSafetySettings: SafetySetting[] | un
         const safetySettings: SafetySetting[] = [];
         Object.entries(envSafetySettings).forEach(([category, threshold]) => {
             if (threshold && VALID_HARM_THRESHOLDS.includes(threshold)) {
-                safetySettings.push({ category, threshold } as SafetySetting);
+                safetySettings.push({category, threshold} as SafetySetting);
             }
         });
         return safetySettings;
     }
-    
+
     // 复制请求中的所有安全设置
     const finalSettings = [...requestSafetySettings];
-    
+
     // 环境变量中有设置的类别，替换或添加到最终设置中
     Object.entries(envSafetySettings).forEach(([category, threshold]) => {
         if (threshold && VALID_HARM_THRESHOLDS.includes(threshold)) {
@@ -54,14 +48,14 @@ export function getValidHarmSettings(requestSafetySettings: SafetySetting[] | un
             const existingIndex = finalSettings.findIndex(s => s.category === category);
             if (existingIndex >= 0) {
                 // 替换请求中的设置
-                finalSettings[existingIndex] = { category, threshold } as SafetySetting;
+                finalSettings[existingIndex] = {category, threshold} as SafetySetting;
             } else {
                 // 添加新的设置
-                finalSettings.push({ category, threshold } as SafetySetting);
+                finalSettings.push({category, threshold} as SafetySetting);
             }
         }
     });
-    
+
     return finalSettings;
 }
 

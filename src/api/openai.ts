@@ -1,11 +1,11 @@
-import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
+import {Hono} from 'hono';
+import {streamSSE} from 'hono/streaming';
 import OpenAI from 'openai';
-import type { ChatCompletionCreateParams, EmbeddingCreateParams, ImageGenerateParams } from 'openai/resources';
+import type {ChatCompletionCreateParams, EmbeddingCreateParams} from 'openai/resources';
 
-import { getApiKey } from './utils/apikey';
-import createErrorResponse from './utils/error';
-import { openaiAuthMiddleware } from './utils/middleware'
+import {getApiKey} from '../utils/apikey';
+import createErrorResponse from '../utils/error';
+import {openaiAuthMiddleware} from '../utils/middleware'
 
 const oai = new Hono();
 
@@ -16,15 +16,15 @@ const baseURL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 // OpenAI工厂
 function getOpenAIClient(model: string | undefined = undefined) {
     return new OpenAI({
-        apiKey: getApiKey(model),
-        baseURL: baseURL
+        apiKey: getApiKey(model), baseURL: baseURL
     });
 }
 
 // 创建聊天
 oai.post('/chat/completions', async (c) => {
-    const { messages, model, tools, tool_choice, stream = false } =
-        await c.req.json() as ChatCompletionCreateParams & { stream?: boolean };
+    const {messages, model, tools, tool_choice, stream = false} = await c.req.json() as ChatCompletionCreateParams & {
+        stream?: boolean
+    };
     const openai = getOpenAIClient(model); // 传入模型参数
 
     try {
@@ -32,26 +32,22 @@ oai.post('/chat/completions', async (c) => {
         if (stream) {
             // 创建流式请求
             const completion = await openai.chat.completions.create({
-                model: model,
-                messages: messages,
-                tools: tools,
-                tool_choice: tool_choice,
-                stream: true,
+                model: model, messages: messages, tools: tools, tool_choice: tool_choice, stream: true,
             });
 
             // 使用 Hono 的 streamSSE 进行流式处理
             return streamSSE(c, async (stream) => {
                 try {
                     for await (const chunk of completion) {
-                        stream.writeSSE({
+                        await stream.writeSSE({
                             data: JSON.stringify(chunk)
                         });
                     }
-                    stream.writeSSE({ data: '[DONE]' });
+                    await stream.writeSSE({data: '[DONE]'});
                 } catch (error) {
                     console.error('流式处理错误:', error);
-                    stream.writeSSE({
-                        data: JSON.stringify({ error: createErrorResponse(error) })
+                    await stream.writeSSE({
+                        data: JSON.stringify({error: createErrorResponse(error)})
                     });
                 }
             });
@@ -59,16 +55,13 @@ oai.post('/chat/completions', async (c) => {
 
         // 非流式响应
         const response = await openai.chat.completions.create({
-            model: model,
-            messages: messages,
-            tools: tools,
-            tool_choice: tool_choice,
+            model: model, messages: messages, tools: tools, tool_choice: tool_choice,
         });
 
         return c.json(response);
     } catch (error: any) {
         console.error('API调用错误:', error);
-        const { status, body } = createErrorResponse(error);
+        const {status, body} = createErrorResponse(error);
         return c.json(body, status);
     }
 })
@@ -81,19 +74,18 @@ oai.get('/models', async (c) => {
     try {
         const models = await openai.models.list();
         return c.json({
-            object: "list",
-            data: models.data
+            object: "list", data: models.data
         });
     } catch (error: any) {
         console.error('获取模型错误:', error);
-        const { status, body } = createErrorResponse(error);
+        const {status, body} = createErrorResponse(error);
         return c.json(body, status);
     }
 })
 
 // 检索模型
 oai.get('/models/:model', async (c) => {
-    const { model: modelId } = c.req.param();
+    const {model: modelId} = c.req.param();
     const openai = getOpenAIClient();
 
     try {
@@ -101,7 +93,7 @@ oai.get('/models/:model', async (c) => {
         return c.json(model);
     } catch (error: any) {
         console.error('检索模型错误:', error);
-        const { status, body } = createErrorResponse(error);
+        const {status, body} = createErrorResponse(error);
         return c.json(body, status);
     }
 })
@@ -109,14 +101,11 @@ oai.get('/models/:model', async (c) => {
 
 // Embeddings
 oai.post('/embeddings', async (c) => {
-    const { model, input, encoding_format, dimensions } =
-        await c.req.json() as EmbeddingCreateParams;
+    const {model, input, encoding_format, dimensions} = await c.req.json() as EmbeddingCreateParams;
 
     if (!model || !input) {
         const errorResponse = createErrorResponse({
-            message: "请求体必须包含 'model' 和 'input' 参数。",
-            type: "invalid_request_error",
-            status: 400
+            message: "请求体必须包含 'model' 和 'input' 参数。", type: "invalid_request_error", status: 400
         });
         return c.json(errorResponse.body, errorResponse.status);
     }
@@ -126,22 +115,16 @@ oai.post('/embeddings', async (c) => {
     try {
         const embeddingResponse = await openai.embeddings.create({
             model: model,
-            input: input,
-            ...(encoding_format && { encoding_format: encoding_format }),
-            ...(dimensions && { dimensions: dimensions })
+            input: input, ...(encoding_format && {encoding_format: encoding_format}), ...(dimensions && {dimensions: dimensions})
         });
 
         return c.json(embeddingResponse);
     } catch (error: any) {
         console.error('创建 Embeddings 时出错:', error);
-        const { status, body } = createErrorResponse(error);
+
+        const {status, body} = createErrorResponse(error);
         return c.json(body, status);
     }
-});
-
-// 添加API密钥轮训状态监控端点
-oai.get('/api-rotation-status', async (c) => {
-
 });
 
 export default oai;

@@ -16,7 +16,8 @@ Gemini Party 是一个基于 [Hono](https://github.com/honojs/hono) 的轻量级
 
 ### <img src="public/openai.svg" alt="openai-icon" width="20" style="transform: translateY(.3rem)"> OpenAI 兼容格式
 
-对于 OpenAI 格式的请求使用 `OpenAI SDK`，但是Google对于OpenAI格式的支持仍处于Beta阶段，所有有些功能无法实现，比如 Safety settings 和 Gemini 2.0 Flash 的图文生成，
+对于 OpenAI 格式的请求使用 `OpenAI SDK`，但是Google对于OpenAI格式的支持仍处于Beta阶段，所有有些功能无法实现，比如 Safety
+settings 和 Gemini 2.0 Flash 的图文生成，
 
 - `POST /v1/chat/completions` - 创建聊天补全
 - `POST /v1/embeddings` - 创建文本嵌入
@@ -61,12 +62,12 @@ docker run -d -p 2333:2333 --env-file .env --name gemini-party gemini-party
 
 所有配置选项在 `.env` 文件中设置:
 
-| 参数              | 描述                                                                     | 必填 | 示例                 |
-| ----------------- | ------------------------------------------------------------------------ | ---- | -------------------- |
-| `GEMINI_API_KEY`  | Gemini API 密钥，多个密钥用逗号分隔                                      | 是   | `key1,key2,key3`     |
-| `AUTH_TOKEN`      | 访问认证令牌，可设置多个，逗号分隔                                       | 是   | `sk-test-1234567890` |
-| `API_PREFIX`      | API 路径前缀，用于反向代理场景                                           | 否   | `hf`                 |
-| `HARM_CATEGORY_*` | [Safety settings](https://ai.google.dev/gemini-api/docs/safety-settings) | 否   | `BLOCK_NONE`         |
+| 参数                | 描述                                                                       | 必填 | 示例                   |
+|-------------------|--------------------------------------------------------------------------|----|----------------------|
+| `GEMINI_API_KEY`  | Gemini API 密钥，多个密钥用逗号分隔                                                  | 是  | `key1,key2,key3`     |
+| `AUTH_TOKEN`      | 访问认证令牌，可设置多个，逗号分隔                                                        | 是  | `sk-test-1234567890` |
+| `API_PREFIX`      | API 路径前缀，用于反向代理场景                                                        | 否  | `hf`                 |
+| `HARM_CATEGORY_*` | [Safety settings](https://ai.google.dev/gemini-api/docs/safety-settings) | 否  | `BLOCK_NONE`         |
 
 <p style="font-size:.92rem">* OpenAI 兼容格式不支持 <code>HARM_CATEGORY_*</code> 相关设置</p>
 
@@ -178,4 +179,5 @@ gemini-pool/
 ```
 
 ## 📄 开源许可
+
 [MIT LICENSE](/LICENSE)

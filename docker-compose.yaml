@@ -4,6 +4,6 @@ services:
     container_name: gemini-party
     restart: always
     ports:
-      - "2333:2333"
+      - "2333:3000"
     env_file:
       - .env

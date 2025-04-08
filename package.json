@@ -12,6 +12,7 @@
   "private": true,
   "scripts": {
     "start": "bun ./src/index.ts",
+    "bun-build": "bun build ./src/index.ts --outfile ./dist/server.js --target=node --external hono --external @google/genai --external openai",
     "docker-build": "docker build --pull -t gemini-party ."
   },
   "type": "module",

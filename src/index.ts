@@ -1,8 +1,8 @@
-import { Hono } from "hono";
+import {Hono} from "hono";
 
-import genai from "./gemini";
-import oai from "./openai";
-import { getRotationStatus } from "./utils/apikey";
+import genai from "./api/gemini";
+import oai from "./api/openai";
+import {getRotationStatus} from "./utils/apikey";
 import createErrorResponse from "./utils/error";
 import validateHarmCategories from "./utils/safety";
 
@@ -18,22 +18,17 @@ app.route(API_PREFIX + "/v1", oai);
 app.route(API_PREFIX + "/v1beta", genai);
 
 app.get("/info", async (c) => {
-  try {
-    const status = getRotationStatus();
-    return c.json({
-      status: "success",
-      data: status,
-    });
-  } catch (error: any) {
-    console.error("获取轮训状态错误:", error);
-    const { status, body } = createErrorResponse(error);
-    return c.json(body, status);
-  }
+    try {
+        const status = getRotationStatus();
+        return c.json({
+            status: "success", data: status,
+        });
+    } catch (error: any) {
+        console.error("获取轮训状态错误:", error);
+        const {status, body} = createErrorResponse(error);
+        return c.json(body, status);
+    }
 });
 
 // 导出为 Bun 兼容格式
-export default {
-  port: 2333,
-  hostname: "0.0.0.0",
-  fetch: app.fetch,
-};
+export default app;
