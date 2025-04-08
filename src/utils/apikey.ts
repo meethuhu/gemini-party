@@ -1,158 +1,23 @@
-import {config} from './config';
+import { config } from './config';
+import { kvStore as kvStoreInstance } from './kv';
 
-/**
- * KV存储接口抽象
- * 允许在不同平台间切换实现
- */
-interface KVStore {
-    get(key: string): Promise<unknown>;
-    set(key: string, value: unknown, options?: { expireIn?: number }): Promise<void>;
-    getType(): string;
-}
-
-// 定义Deno类型，避免类型错误
-declare namespace Deno {
-    interface Kv {
-        get(key: string[] | Deno.KvKey): Promise<Deno.KvEntryMaybe<unknown>>;
-        set(key: string[] | Deno.KvKey, value: unknown, options?: { expireIn?: number }): Promise<Deno.KvCommitResult>;
-    }
-    
-    interface KvKey {
-        [index: number]: string | number | boolean | Uint8Array;
-        length: number;
-    }
-    
-    interface KvEntryMaybe<T> {
-        key: KvKey;
-        value: T | null;
-        versionstamp: string | null;
-    }
-    
-    interface KvCommitResult {
-        ok: boolean;
-        versionstamp: string;
-    }
-    
-    function openKv(): Promise<Kv>;
-}
-
-/**
- * Deno KV存储实现
- * 用于Deno Deploy环境
- */
-class DenoKVStore implements KVStore {
-    private kv: Deno.Kv | null = null;
-    constructor() {
-        try {
-            // @ts-ignore - Deno API在非Deno环境会报错
-            Deno.openKv?.().then(kv => {
-                this.kv = kv;
-            }).catch(error => {
-                console.error('无法初始化Deno KV存储:', error);
-            });
-        } catch (error) {
-            console.error('无法初始化Deno KV存储:', error);
-        }
-    }
-
-    async get(key: string): Promise<unknown> {
-        if (!this.kv) return null;
-        try {
-            // @ts-ignore
-            const result = await this.kv.get([key]);
-            return result?.value || null;
-        } catch (error) {
-            console.error(`Deno KV get错误 (${key}):`, error);
-            return null;
-        }
-    }
-
-    async set(key: string, value: unknown, options?: { expireIn?: number }): Promise<void> {
-        if (!this.kv) return;
-        try {
-            const opts = options?.expireIn ? {expireIn: options.expireIn} : undefined;
-            // @ts-ignore
-            await this.kv.set([key], value, opts);
-        } catch (error) {
-            console.error(`Deno KV set错误 (${key}):`, error);
-        }
-    }
-
-    getType(): string {
-        return 'DenoKV';
-    }
-}
-
-/**
- * 内存KV存储实现
- * 用于开发环境或非Deno环境
- */
-class MemoryKVStore implements KVStore {
-    private store = new Map<string, unknown>();
-    private expiryMap = new Map<string, number>();
-
-    async get(key: string): Promise<unknown> {
-        // 检查是否过期
-        if (this.expiryMap.has(key)) {
-            const expiryTime = this.expiryMap.get(key);
-            if (expiryTime && expiryTime < Date.now()) {
-                this.store.delete(key);
-                this.expiryMap.delete(key);
-                return null;
-            }
-        }
-        return this.store.get(key);
-    }
-
-    async set(key: string, value: unknown, options?: { expireIn?: number }): Promise<void> {
-        this.store.set(key, value);
-
-        // 设置过期时间
-        if (options?.expireIn) {
-            const expiryTime = Date.now() + options.expireIn;
-            this.expiryMap.set(key, expiryTime);
-        }
-    }
-
-    getType(): string {
-        return 'MemoryKV';
-    }
-}
-
-/**
- * 创建适当的KV存储实例
- */
-function createKVStore(): KVStore {
-    // 检测环境是否为Deno
-    try {
-        // @ts-ignore
-        if (typeof Deno !== 'undefined' && Deno.openKv) {
-            return new DenoKVStore();
-        }
-    } catch (e) {
-        // 忽略错误
-    }
-    return new MemoryKVStore();
-}
-
-// 单例KV存储实例
-const kvStore = createKVStore();
-
-// KV存储键名常量
+// 常量配置
 const KV_PREFIX = 'gemini_party_api_rotation';
 const MODEL_ROTATION_KEY = `${KV_PREFIX}:model_rotations`;
 const LAST_RESET_KEY = `${KV_PREFIX}:last_reset_time`;
+const ROTATION_RESET_INTERVAL = 60000; // 轮询重置间隔(毫秒) - 1分钟
 
 /**
- * 获取并解析 GEMINI_API_KEY 列表
+ * 解析 GEMINI_API_KEY 列表
  * @returns 清洗后的密钥数组
- * @throws {Error}
+ * @throws {Error} 当API密钥未正确设置时抛出错误
  */
-function passApiKeys(): string[] {
+function parseApiKeys(): string[] {
     const apiKeyArray = config.api.GEMINI_API_KEY;
     if (!apiKeyArray) {
         throw new Error('GEMINI_API_KEY not set correctly');
     }
+
     return apiKeyArray
         .split(',')
         .map((key) => key.trim())
@@ -160,71 +25,84 @@ function passApiKeys(): string[] {
 }
 
 // 缓存API密钥数组
-const geminiApiKeys = passApiKeys();
-
-/**
- * 初始化或获取轮询状态
- */
-async function getModelRotations(): Promise<Record<string, number>> {
-    const rotations = await kvStore.get(MODEL_ROTATION_KEY);
-    return (rotations as Record<string, number>) || {};
-}
-
-/**
- * 保存轮询状态
- */
-async function saveModelRotation(model: string, index: number): Promise<void> {
-    const rotations = await getModelRotations();
-    rotations[model] = index;
-
-    // 设置60秒过期时间
-    await kvStore.set(MODEL_ROTATION_KEY, rotations, {expireIn: 60000});
-}
+const geminiApiKeys = parseApiKeys();
 
 /**
  * 获取上次重置时间
+ * @returns 上次重置时间(毫秒时间戳)
  */
 async function getLastResetTime(): Promise<number> {
-    const lastReset = await kvStore.get(LAST_RESET_KEY);
+    const lastReset = await kvStoreInstance.get(LAST_RESET_KEY);
     if (!lastReset) {
         const now = Date.now();
-        await kvStore.set(LAST_RESET_KEY, now);
+        await kvStoreInstance.set(LAST_RESET_KEY, now);
         return now;
     }
     return lastReset as number;
 }
 
 /**
+ * 初始化或获取轮询状态
+ * @returns 各模型的轮询索引记录
+ */
+async function getModelRotations(): Promise<Record<string, number>> {
+    const rotations = await kvStoreInstance.get(MODEL_ROTATION_KEY);
+
+    // 检查上次重置时间，如果超过设定时间则重置计数
+    const lastReset = await getLastResetTime();
+    const now = Date.now();
+    const timeSinceReset = now - lastReset;
+
+    // 如果超过重置间隔，重置计数并更新重置时间
+    if (timeSinceReset > ROTATION_RESET_INTERVAL) {
+        // 更新上次重置时间为当前时间
+        await kvStoreInstance.set(LAST_RESET_KEY, now);
+        // 返回空对象以重置所有模型的轮询计数
+        return {};
+    }
+
+    return (rotations as Record<string, number>) || {};
+}
+
+/**
+ * 保存轮询状态
+ * @param model 模型名称
+ * @param index 轮询索引
+ */
+async function saveModelRotation(model: string, index: number): Promise<void> {
+    const rotations = await getModelRotations();
+    rotations[model] = index;
+
+    // 设置过期时间
+    await kvStoreInstance.set(MODEL_ROTATION_KEY, rotations, { expireIn: ROTATION_RESET_INTERVAL });
+}
+
+/**
  * 获取API密钥
  * 通过轮询方式从预设的密钥列表中获取一个密钥，按模型区分
- * @param {string} model 模型名称，不同模型使用不同的轮训计数
- * @returns {Promise<string>} Gemini API密钥
+ * @param model 模型名称，不同模型使用不同的轮询计数
+ * @returns Gemini API密钥
  */
 export async function getApiKey(model: string | undefined = undefined): Promise<string> {
     if (model === undefined) {
         // 安全处理第一个密钥返回
         return geminiApiKeys[0] || '';
     }
-
-    // 获取当前模型的轮训索引
+    // 获取当前模型的轮询索引
     const rotations = await getModelRotations();
     let currentIndex = rotations[model] || 0;
-
     // 确保索引在有效范围内
     currentIndex = currentIndex % geminiApiKeys.length;
-
     // 获取密钥
     const key = geminiApiKeys[currentIndex] || '';
-
     // 更新并保存索引
     await saveModelRotation(model, currentIndex + 1);
-
     return key;
 }
 
 /**
- * 获取API密钥轮训状态
- * @returns 包含密钥总数、各模型轮训计数和下次重置时间的状态对象
+ * 获取API密钥轮询状态
+ * @returns 包含密钥总数、各模型轮询计数和下次重置时间的状态对象
  */
 export async function getRotationStatus(): Promise<{
     keysTotal: number;
@@ -236,12 +114,16 @@ export async function getRotationStatus(): Promise<{
 }> {
     const modelRotations = await getModelRotations();
     const lastResetTime = await getLastResetTime();
-    const nextResetTime = lastResetTime + 60000; // 1分钟后重置
+    const nextResetTime = lastResetTime + ROTATION_RESET_INTERVAL;
     const now = Date.now();
     const remainingTime = nextResetTime - now;
 
     return {
-        keysTotal: geminiApiKeys.length, modelRotations, lastResetTime, nextResetTime, remainingTime, // 毫秒
-        kvType: kvStore.getType(), // 返回当前KV存储类型
+        keysTotal: geminiApiKeys.length,
+        modelRotations,
+        lastResetTime,
+        nextResetTime,
+        remainingTime,
+        kvType: kvStoreInstance.getType(),
     };
 }
