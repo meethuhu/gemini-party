@@ -12,7 +12,7 @@
   "private": true,
   "scripts": {
     "run": "bun ./src/index.ts",
-    "docker-build": "docker build --pull -t genzilla ."
+    "docker-build": "docker build --pull -t gemini-party ."
   },
   "type": "module",
   "devDependencies": {
