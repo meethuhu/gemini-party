@@ -2,8 +2,8 @@
   "name": "gemini-party",
   "module": "index.ts",
   "dependencies": {
-    "hono": "^4.7.5",
     "@google/genai": "^0.7.0",
+    "hono": "^4.7.5",
     "openai": "^4.92.1"
   },
   "peerDependencies": {

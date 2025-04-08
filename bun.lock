@@ -6,13 +6,13 @@
       "dependencies": {
         "@google/genai": "^0.7.0",
         "hono": "^4.7.5",
-        "openai": "^4.92.0",
+        "openai": "^4.92.1",
       },
       "devDependencies": {
         "prettier": "^3.5.3",
       },
       "peerDependencies": {
-        "typescript": "^5.8.2",
+        "typescript": "^5.8.3",
       },
     },
   },

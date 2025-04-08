@@ -1,10 +1,11 @@
-import {Hono} from "hono";
+import { Hono } from "hono";
 
 import genai from "./api/gemini";
 import oai from "./api/openai";
-import {getRotationStatus} from "./utils/apikey";
+import { getRotationStatus } from "./utils/apikey";
 import createErrorResponse from "./utils/error";
 import validateHarmCategories from "./utils/safety";
+import { config } from './utils/config';
 
 const app = new Hono();
 
@@ -12,7 +13,7 @@ const app = new Hono();
 validateHarmCategories();
 
 // API 前缀
-const API_PREFIX: string = process.env.API_PREFIX ?? "";
+const API_PREFIX: string = config.api.API_PREFIX ?? "";
 
 app.route(API_PREFIX + "/v1", oai);
 app.route(API_PREFIX + "/v1beta", genai);
@@ -25,7 +26,7 @@ app.get("/info", async (c) => {
         });
     } catch (error: any) {
         console.error("获取轮训状态错误:", error);
-        const {status, body} = createErrorResponse(error);
+        const { status, body } = createErrorResponse(error);
         return c.json(body, status);
     }
 });

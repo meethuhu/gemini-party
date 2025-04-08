@@ -1,10 +1,12 @@
+import { config } from './config';
+
 /**
  * 获取并解析 GEMINI_API_KEY 列表
  * @returns 清洗后的密钥数组
  * @throws {Error}
  */
 function passApiKeys(): string[] {
-    const apiKeyArray = process.env.GEMINI_API_KEY;
+    const apiKeyArray = config.api.GEMINI_API_KEY;
     if (!apiKeyArray) {
         throw new Error('GEMINI_API_KEY not set correctly');
     }

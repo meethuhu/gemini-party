@@ -1,0 +1,14 @@
+export const config = {
+    safety: {
+        HARM_CATEGORY_HARASSMENT: process.env.HARM_CATEGORY_HARASSMENT,
+        HARM_CATEGORY_DANGEROUS_CONTENT: process.env.HARM_CATEGORY_DANGEROUS_CONTENT,
+        HARM_CATEGORY_SEXUALLY_EXPLICIT: process.env.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        HARM_CATEGORY_HATE_SPEECH: process.env.HARM_CATEGORY_HATE_SPEECH,
+        HARM_CATEGORY_CIVIC_INTEGRITY: process.env.HARM_CATEGORY_CIVIC_INTEGRITY,
+    },
+    api: {
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+        AUTH_TOKEN: process.env.AUTH_TOKEN,
+        API_PREFIX: process.env.API_PREFIX,
+    }
+} as const;
