@@ -11,7 +11,7 @@
   },
   "private": true,
   "scripts": {
-    "run": "bun ./src/index.ts",
+    "start": "bun ./src/index.ts",
     "docker-build": "docker build --pull -t gemini-party ."
   },
   "type": "module",
