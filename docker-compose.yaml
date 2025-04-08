@@ -1,0 +1,9 @@
+services:
+  gemini-party:
+    image: gemini-party:latest
+    container_name: gemini-party
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
