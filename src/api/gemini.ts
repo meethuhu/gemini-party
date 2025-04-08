@@ -45,7 +45,6 @@ async function handleGenerateContent(c: Context, model: string, apiKey: string, 
 async function handleGenerateContentStream(c: Context, model: string, // 添加model参数
     apiKey: string, originalBody: any): Promise<Response> {
     const ai = new GoogleGenAI({ apiKey: apiKey });
-    const isGoogleClient = c.req.header('x-goog-api-client')?.includes('genai-js') || false;
     const body = normalizeRequestBody(originalBody, model); // 传入model参数
     try {
         const result = await ai.models.generateContentStream({
