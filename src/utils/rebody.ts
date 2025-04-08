@@ -62,7 +62,7 @@ export default function normalizeRequestBody(
   };
 
   // 调试模式
-  looog(modelName, originalBody, finalConfig);
+  // looog(modelName, originalBody, finalConfig);
 
   // 构建标准请求体
   return {
