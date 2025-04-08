@@ -13,10 +13,27 @@ interface KVStore {
 // 定义Deno类型，避免类型错误
 declare namespace Deno {
     interface Kv {
-        get(key: string[]): Promise<{ value: unknown }>;
-        set(key: string[], value: unknown, options?: { expireIn?: number }): Promise<void>;
+        get(key: string[] | Deno.KvKey): Promise<Deno.KvEntryMaybe<unknown>>;
+        set(key: string[] | Deno.KvKey, value: unknown, options?: { expireIn?: number }): Promise<Deno.KvCommitResult>;
     }
-    function openKv(): Kv;
+    
+    interface KvKey {
+        [index: number]: string | number | boolean | Uint8Array;
+        length: number;
+    }
+    
+    interface KvEntryMaybe<T> {
+        key: KvKey;
+        value: T | null;
+        versionstamp: string | null;
+    }
+    
+    interface KvCommitResult {
+        ok: boolean;
+        versionstamp: string;
+    }
+    
+    function openKv(): Promise<Kv>;
 }
 
 /**
@@ -28,7 +45,11 @@ class DenoKVStore implements KVStore {
     constructor() {
         try {
             // @ts-ignore - Deno API在非Deno环境会报错
-            this.kv = Deno.openKv?.();
+            Deno.openKv?.().then(kv => {
+                this.kv = kv;
+            }).catch(error => {
+                console.error('无法初始化Deno KV存储:', error);
+            });
         } catch (error) {
             console.error('无法初始化Deno KV存储:', error);
         }
@@ -36,16 +57,25 @@ class DenoKVStore implements KVStore {
 
     async get(key: string): Promise<unknown> {
         if (!this.kv) return null;
-        // @ts-ignore
-        const result = await this.kv.get([key]);
-        return result.value;
+        try {
+            // @ts-ignore
+            const result = await this.kv.get([key]);
+            return result?.value || null;
+        } catch (error) {
+            console.error(`Deno KV get错误 (${key}):`, error);
+            return null;
+        }
     }
 
     async set(key: string, value: unknown, options?: { expireIn?: number }): Promise<void> {
         if (!this.kv) return;
-        const opts = options?.expireIn ? {expireIn: options.expireIn} : undefined;
-        // @ts-ignore
-        await this.kv.set([key], value, opts);
+        try {
+            const opts = options?.expireIn ? {expireIn: options.expireIn} : undefined;
+            // @ts-ignore
+            await this.kv.set([key], value, opts);
+        } catch (error) {
+            console.error(`Deno KV set错误 (${key}):`, error);
+        }
     }
 
     getType(): string {
