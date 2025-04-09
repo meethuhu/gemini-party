@@ -3,6 +3,11 @@
 Gemini Party 是一个基于 [Hono](https://github.com/honojs/hono) 的轻量级 Gemini API 代理服务，支持轮询负载均衡
 ，同时支持 Gemini API 格式和 OpenAI 兼容格式的 API 调用。
 
+## 💻 支持平台
+
+- Docker
+- Deno Deploy
+
 ## 📚 接口说明
 
 ### <img src="public/gemini.svg" alt="gemini-icon" width="20" style="transform: translateY(.3rem)"> Gemini 原生格式
@@ -51,11 +56,11 @@ bun start
 ### 使用 Docker
 
 ```bash
-# 构建镜像
-docker build -t gemini-party .
+# 拉取镜像
+docker pull ghcr.io/meethuhu/gemini-party:latest
 
 # 运行容器
-docker run -d -p 2333:3000 --env-file .env --name gemini-party gemini-party
+docker run -d -p 2333:3000 --env-file .env --name gemini-party ghcr.io/meethuhu/gemini-party:latest
 ```
 
 ### 使用 Docker Compose
@@ -65,31 +70,19 @@ docker run -d -p 2333:3000 --env-file .env --name gemini-party gemini-party
 docker-compose up -d
 ```
 
-### 无服务器部署
-
-项目支持部署到无服务器环境：
-
-```bash
-# 构建Bun运行时版本
-bun run bun-build
-
-# 构建Deno运行时版本
-bun run deno-build
-```
-
 ## ⚙️ 环境变量
 
 所有配置选项在 `.env` 文件中设置:
 
-| 参数                      | 描述                                                                       | 必填 | 示例                   |
-|-------------------------|--------------------------------------------------------------------------|----|----------------------|
-| `GEMINI_API_KEY`        | Gemini API 密钥，多个密钥用逗号分隔                                                  | 是  | `key1,key2,key3`     |
-| `AUTH_TOKEN`            | 访问认证令牌，可设置多个，逗号分隔                                                        | 是  | `sk-test-1234567890` |
-| `API_PREFIX`            | API 路径前缀，用于反向代理场景                                                        | 否  | `hf`                 |
-| `HARM_CATEGORY_*`       | [Safety settings](https://ai.google.dev/gemini-api/docs/safety-settings) | 否  | `BLOCK_NONE`         |
-| `ROTATION_RESET_INTERVAL` | 轮询重置间隔(毫秒)                                                              | 否  | `60000`              |
-| `BLACKLIST_TIMEOUT`     | 黑名单超时时间(毫秒)                                                             | 否  | `300000`             |
-| `DEFAULT_MAX_RETRIES`   | 最大重试次数                                                                   | 否  | `3`                  |
+| 参数                      | 描述                                                                     | 必填 | 示例                 |
+| ------------------------- | ------------------------------------------------------------------------ | ---- | -------------------- |
+| `GEMINI_API_KEY`          | Gemini API 密钥，多个密钥用逗号分隔                                      | 是   | `key1,key2,key3`     |
+| `AUTH_TOKEN`              | 访问认证令牌，可设置多个，逗号分隔                                       | 是   | `sk-test-1234567890` |
+| `API_PREFIX`              | API 路径前缀，用于反向代理场景                                           | 否   | `hf`                 |
+| `HARM_CATEGORY_*`         | [Safety settings](https://ai.google.dev/gemini-api/docs/safety-settings) | 否   | `BLOCK_NONE`         |
+| `ROTATION_RESET_INTERVAL` | 轮询重置间隔(毫秒)                                                       | 否   | `60000`              |
+| `BLACKLIST_TIMEOUT`       | 黑名单超时时间(毫秒)                                                     | 否   | `300000`             |
+| `DEFAULT_MAX_RETRIES`     | 最大重试次数                                                             | 否   | `3`                  |
 
 <p style="font-size:.92rem">* OpenAI 兼容格式不支持 <code>HARM_CATEGORY_*</code> 相关设置</p>
 

@@ -1,6 +1,6 @@
 services:
   gemini-party:
-    image: gemini-party:latest
+    image: ghcr.io/meethuhu/gemini-party:latest
     container_name: gemini-party
     restart: always
     ports:
