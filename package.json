@@ -1,6 +1,6 @@
 {
   "name": "gemini-party",
-  "version": "0.0.17",
+  "version": "1.0.0",
   "module": "index.ts",
   "dependencies": {
     "@google/genai": "^0.7.0",
