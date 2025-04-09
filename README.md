@@ -70,6 +70,10 @@ docker run -d -p 2333:3000 --env-file .env --name gemini-party ghcr.io/meethuhu/
 docker-compose up -d
 ```
 
+### 使用 Deno Deploy 部署
+1. 复制 [`/serverless/deno.js`](serverless/deno.js) 文件内容
+2. 前往 [`deno.dev`](https://deno.dev) 使用 `New Playground` 功能
+
 ## ⚙️ 环境变量
 
 所有配置选项在 `.env` 文件中设置:
