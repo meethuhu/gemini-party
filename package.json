@@ -12,8 +12,9 @@
   "private": true,
   "scripts": {
     "start": "bun ./src/index.ts",
-    "bun-build": "bun build ./src/index.ts --outfile ./dist/server.js --target=node --external hono --external @google/genai --external openai",
-    "docker-build": "docker build --pull -t gemini-party ."
+    "docker-build": "docker build --pull -t gemini-party .",
+    "bun-build": "bun build ./src/index.ts --outfile ./serverless/bun.js --target=node --external hono --external @google/genai --external openai",
+    "deno-build": "bun build ./src/index.ts --outfile ./serverless/deno.js --target=node --external hono --external @google/genai --external openai && node ./script/deno-modify-imports.js"
   },
   "type": "module",
   "devDependencies": {
