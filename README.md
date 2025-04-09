@@ -88,7 +88,7 @@ docker-compose up -d
 | 参数                      | 描述                                                                     | 必填 | 示例                 |
 | ------------------------- | ------------------------------------------------------------------------ | ---- | -------------------- |
 | `GEMINI_API_KEY`          | Gemini API 密钥，多个密钥用逗号分隔                                      | 是   | `key1,key2,key3`     |
-| `AUTH_TOKEN`              | 访问认证令牌，可设置多个，逗号分隔                                       | 是   | `sk-test-1234567890` |
+| `AUTH_TOKEN`              | 访问认证令牌                                       | 是   | `sk-test-1234567890` |
 | `API_PREFIX`              | API 路径前缀，用于反向代理场景                                           | 否   | `hf`                 |
 | `HARM_CATEGORY_*`         | [Safety settings](https://ai.google.dev/gemini-api/docs/safety-settings) | 否   | `BLOCK_NONE`         |
 | `ROTATION_RESET_INTERVAL` | 轮询重置间隔(毫秒)                                                       | 否   | `60000`              |
