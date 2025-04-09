@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import OpenAI from 'openai';
 
-import { getApiKey } from '../utils/apikey.ts';
+import { getApiKey, withRetry, withoutBalancing } from '../utils/apikey.ts';
 import { createErrorResponse, createHonoErrorResponse } from '../utils/error';
 import { geminiAuthMiddleware, openaiAuthMiddleware } from '../utils/middleware';
 import normalizeRequestBody from '../utils/rebody';
@@ -26,12 +26,15 @@ const actionHandlers: Record<string, HandlerFunction> = {
 
 // 非流式内容处理
 async function handleGenerateContent(c: Context, model: string, apiKey: string, originalBody: any): Promise<Response> {
-    const ai = new GoogleGenAI({ apiKey: apiKey });
     const body = normalizeRequestBody(originalBody, model);
 
     try {
-        const response = await ai.models.generateContent({
-            ...body,
+        // 使用withRetry包装API调用
+        const response = await withRetry(model, async (key) => {
+            const ai = new GoogleGenAI({ apiKey: key });
+            return await ai.models.generateContent({
+                ...body,
+            });
         });
 
         return c.json(response);
@@ -42,14 +45,19 @@ async function handleGenerateContent(c: Context, model: string, apiKey: string, 
 }
 
 // 流式内容处理
-async function handleGenerateContentStream(c: Context, model: string, // 添加model参数
+async function handleGenerateContentStream(c: Context, model: string,
     apiKey: string, originalBody: any): Promise<Response> {
-    const ai = new GoogleGenAI({ apiKey: apiKey });
-    const body = normalizeRequestBody(originalBody, model); // 传入model参数
+    const body = normalizeRequestBody(originalBody, model);
+
     try {
-        const result = await ai.models.generateContentStream({
-            ...body,
+        // 使用withRetry包装API调用
+        const result = await withRetry(model, async (key) => {
+            const ai = new GoogleGenAI({ apiKey: key });
+            return await ai.models.generateContentStream({
+                ...body,
+            });
         });
+
         // Hono 流式响应
         return streamSSE(c, async (stream) => {
             try {
@@ -75,15 +83,19 @@ async function handleGenerateContentStream(c: Context, model: string, // 添加m
 
 // Embeddings
 async function handleEmbedContent(c: Context, model: string, apiKey: string, body: any): Promise<Response> {
-    const ai = new GoogleGenAI({ apiKey: apiKey });
     const contents = body.content;
 
     try {
-        const response = await ai.models.embedContent({
-            model, contents, config: {
-                taskType: body.task_type, title: body.title, outputDimensionality: body.outputDimensionality,
-            },
+        // 使用withRetry包装API调用
+        const response = await withRetry(model, async (key) => {
+            const ai = new GoogleGenAI({ apiKey: key });
+            return await ai.models.embedContent({
+                model, contents, config: {
+                    taskType: body.task_type, title: body.title, outputDimensionality: body.outputDimensionality,
+                },
+            });
         });
+
         return c.json({
             embedding: response?.embeddings?.[0] || { values: [] },
         });
@@ -118,28 +130,47 @@ genai.post('/models/:modelAction{.+:.+}', async (c: Context) => {
     }
 
     const body = await c.req.json();
-    const apiKey = await getApiKey(model);
-
-    return handler(c, model, apiKey, body);
+    return handler(c, model, '', body);
 });
 
 // 获取所有模型
 genai.get('/models', async (c: Context) => {
-    const API_KEY = await getApiKey();
-    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
-    const response = await fetch(url);
-    const data = (await response.json()) as Record<string, any>;
-    return c.json(data);
+    try {
+        const data = await withoutBalancing(async (key) => {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`获取模型列表失败: ${response.statusText}`);
+            }
+            return await response.json() as Record<string, any>;
+        });
+
+        return c.json(data);
+    } catch (error) {
+        console.error('获取模型列表错误:', error);
+        return createHonoErrorResponse(c, error);
+    }
 });
 
 // 检索模型
 genai.get('/models/:model', async (c: Context) => {
     const model = c.req.param('model');
-    const API_KEY = await getApiKey();
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${API_KEY}`;
-    const response = await fetch(url);
-    const data = (await response.json()) as Record<string, any>;
-    return c.json(data);
+
+    try {
+        const data = await withoutBalancing(async (key) => {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${key}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`获取模型信息失败: ${response.statusText}`);
+            }
+            return await response.json() as Record<string, any>;
+        });
+
+        return c.json(data);
+    } catch (error) {
+        console.error(`获取模型 ${model} 信息错误:`, error);
+        return createHonoErrorResponse(c, error);
+    }
 });
 
 // OpenAI 格式的 Embeddings
@@ -153,14 +184,19 @@ genai.post('/openai/embeddings', async (c) => {
         });
     }
 
-    const openai = new OpenAI({
-        apiKey: await getApiKey(model), baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-    });
-
     try {
-        const embeddingResponse = await openai.embeddings.create({
-            model: model,
-            input: input, ...(encoding_format && { encoding_format: encoding_format }), ...(dimensions && { dimensions: dimensions }),
+        const embeddingResponse = await withRetry(model, async (key) => {
+            const openai = new OpenAI({
+                apiKey: key,
+                baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+            });
+
+            return await openai.embeddings.create({
+                model: model,
+                input: input,
+                ...(encoding_format && { encoding_format: encoding_format }),
+                ...(dimensions && { dimensions: dimensions }),
+            });
         });
 
         return c.json(embeddingResponse);

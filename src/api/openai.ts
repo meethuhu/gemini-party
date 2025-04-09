@@ -3,7 +3,7 @@ import {streamSSE} from 'hono/streaming';
 import OpenAI from 'openai';
 import type {ChatCompletionCreateParams, EmbeddingCreateParams} from 'openai/resources';
 
-import {getApiKey} from '../utils/apikey.ts';
+import {getApiKey, withRetry, withoutBalancing} from '../utils/apikey.ts';
 import {createErrorResponse, createHonoErrorResponse} from '../utils/error';
 import {openaiAuthMiddleware} from '../utils/middleware'
 
@@ -13,31 +13,28 @@ oai.use('/*', openaiAuthMiddleware);
 
 const baseURL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
-// OpenAI工厂
-async function getOpenAIClient(model: string | undefined = undefined) {
-    return new OpenAI({
-        apiKey: await getApiKey(model), baseURL: baseURL
-    });
-}
-
 // 创建聊天
 oai.post('/chat/completions', async (c) => {
     const {messages, model, tools, tool_choice, stream = false} = await c.req.json() as ChatCompletionCreateParams & {
         stream?: boolean
     };
-    const openai = await getOpenAIClient(model); // 传入模型参数
 
     try {
         // 处理流式响应
         if (stream) {
             // 创建流式请求
-            const completion = await openai.chat.completions.create({
-                model: model, messages: messages, tools: tools, tool_choice: tool_choice, stream: true,
-            });
-
-            // 使用 Hono 的 streamSSE 进行流式处理
             return streamSSE(c, async (stream) => {
                 try {
+                    const completion = await withRetry(model, async (key) => {
+                        const openai = new OpenAI({
+                            apiKey: key, baseURL: baseURL
+                        });
+
+                        return await openai.chat.completions.create({
+                            model: model, messages: messages, tools: tools, tool_choice: tool_choice, stream: true,
+                        });
+                    });
+
                     for await (const chunk of completion) {
                         await stream.writeSSE({
                             data: JSON.stringify(chunk)
@@ -55,8 +52,14 @@ oai.post('/chat/completions', async (c) => {
         }
 
         // 非流式响应
-        const response = await openai.chat.completions.create({
-            model: model, messages: messages, tools: tools, tool_choice: tool_choice,
+        const response = await withRetry(model, async (key) => {
+            const openai = new OpenAI({
+                apiKey: key, baseURL: baseURL
+            });
+            
+            return await openai.chat.completions.create({
+                model: model, messages: messages, tools: tools, tool_choice: tool_choice,
+            });
         });
 
         return c.json(response);
@@ -68,10 +71,14 @@ oai.post('/chat/completions', async (c) => {
 
 // 列出模型
 oai.get('/models', async (c) => {
-    const openai = await getOpenAIClient();
-
     try {
-        const models = await openai.models.list();
+        const models = await withoutBalancing(async (key) => {
+            const openai = new OpenAI({
+                apiKey: key, baseURL: baseURL
+            });
+            return await openai.models.list();
+        });
+        
         return c.json({
             object: "list", data: models.data
         });
@@ -84,10 +91,15 @@ oai.get('/models', async (c) => {
 // 检索模型
 oai.get('/models/:model', async (c) => {
     const {model: modelId} = c.req.param();
-    const openai = await getOpenAIClient();
-
+    
     try {
-        const model = await openai.models.retrieve(modelId);
+        const model = await withoutBalancing(async (key) => {
+            const openai = new OpenAI({
+                apiKey: key, baseURL: baseURL
+            });
+            return await openai.models.retrieve(modelId);
+        });
+        
         return c.json(model);
     } catch (error: any) {
         console.error('检索模型错误:', error);
@@ -105,12 +117,18 @@ oai.post('/embeddings', async (c) => {
         });
     }
 
-    const openai = await getOpenAIClient(model); // 传入模型参数
-
     try {
-        const embeddingResponse = await openai.embeddings.create({
-            model: model,
-            input: input, ...(encoding_format && {encoding_format: encoding_format}), ...(dimensions && {dimensions: dimensions})
+        const embeddingResponse = await withRetry(model, async (key) => {
+            const openai = new OpenAI({
+                apiKey: key, baseURL: baseURL
+            });
+            
+            return await openai.embeddings.create({
+                model: model,
+                input: input, 
+                ...(encoding_format && {encoding_format: encoding_format}), 
+                ...(dimensions && {dimensions: dimensions})
+            });
         });
 
         return c.json(embeddingResponse);
