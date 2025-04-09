@@ -1,18 +1,5 @@
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-// 读取package.json获取版本号
-let version = '0.0.0';
-try {
-    const __dirname = dirname(fileURLToPath(import.meta.url));
-    const packageJson = JSON.parse(
-        readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8')
-    );
-    version = packageJson.version;
-} catch (error) {
-    console.warn('无法读取package.json版本信息:', error);
-}
+// 版本号 - 此值将在构建时被替换
+const version = '0.0.0'; // BUILD_VERSION_PLACEHOLDER
 
 export const config = {
     version,
