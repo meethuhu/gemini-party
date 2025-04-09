@@ -1,5 +1,27 @@
-// 版本号 - 此值将在构建时被替换
-const version = '0.0.0'; // BUILD_VERSION_PLACEHOLDER
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// 直接从package.json读取版本号
+let version = '0.0.0'; // BUILD_VERSION_PLACEHOLDER
+
+// 尝试在开发环境中读取package.json
+try {
+    // 检查是否在Deno环境
+    if (typeof Deno === 'undefined') {
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
+        const packageJsonPath = path.join(__dirname, '..', '..', 'package.json');
+        
+        if (fs.existsSync(packageJsonPath)) {
+            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+            version = packageJson.version || version;
+        }
+    }
+    // 在Deno环境中，版本号会在构建时被替换
+} catch (error) {
+    console.warn('读取版本信息失败，使用默认版本号:', error);
+}
 
 export const config = {
     version,

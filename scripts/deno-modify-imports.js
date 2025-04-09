@@ -82,28 +82,45 @@ try {
     content = versionComment + content;
   }
   
-  // 更新版本号 - 增强匹配能力，处理var和const两种情况
-  const versionReplacePattern = /(?:var|const|let)\s+version\s*=\s*(['"])0\.0\.0\1;/g;
+  // 更新版本号 - 处理多种可能的格式
+  const versionPatterns = [
+    // 标准版本占位符
+    /(?:var|const|let)\s+version\s*=\s*(['"])0\.0\.0\1;\s*\/\/\s*BUILD_VERSION_PLACEHOLDER/g,
+    // 编译后的版本变量
+    /(?:var|const|let)\s+version\s*=\s*(['"])0\.0\.0\1;/g,
+    // 任何版本的版本变量
+    /(?:var|const|let)\s+version\s*=\s*(['"])[0-9]+\.[0-9]+\.[0-9]+\1;/g
+  ];
   
-  if (content.match(versionReplacePattern)) {
-    console.log('找到版本号占位符，正在替换...');
-    content = content.replace(
-      versionReplacePattern,
-      `var version = '${pkgInfo.version}'; // 自动构建于 ${new Date().toISOString()}`
-    );
-  } else {
-    console.warn('警告: 未找到版本号占位符。手动搜索version变量并替换...');
+  let replaced = false;
+  for (const pattern of versionPatterns) {
+    if (content.match(pattern)) {
+      console.log(`找到版本号模式: ${pattern}`);
+      content = content.replace(
+        pattern,
+        `var version = '${pkgInfo.version}'; // 自动构建于 ${new Date().toISOString()}`
+      );
+      replaced = true;
+      break;
+    }
+  }
+  
+  if (!replaced) {
+    console.warn('警告: 未找到标准版本号格式。尝试替换配置对象中的版本...');
     
-    // 尝试查找配置对象中的version定义
-    const configVersionPattern = /(var|const|let)\s+config\s*=\s*\{\s*[\r\n\s]*version\s*,/;
-    const match = content.match(configVersionPattern);
-    
-    if (match) {
-      // 找到config对象，搜索最近的version变量
-      const versionDefinePattern = /(var|const|let)\s+version\s*=\s*(['"])([^'"]*)\2;/;
+    // 尝试查找配置对象并替换version
+    const configPattern = /\bconfig\s*=\s*\{\s*[\r\n\s]*version\s*,/;
+    if (content.match(configPattern)) {
+      const versionDefinePattern = /(var|const|let)\s+version\s*=\s*(['"])[^'"]*\2;/;
       content = content.replace(versionDefinePattern, 
         `$1 version = '${pkgInfo.version}'; // 自动构建于 ${new Date().toISOString()}`);
+      console.log('已替换config对象中引用的version变量');
+      replaced = true;
     }
+  }
+  
+  if (!replaced) {
+    console.warn('⚠️ 未能替换任何版本号信息');
   }
   
   // 写回文件
