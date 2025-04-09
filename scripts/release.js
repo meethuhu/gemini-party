@@ -76,6 +76,9 @@ if (!fs.existsSync(serverlessDir)) {
 
 // 主程序
 const main = async () => {
+  // 标记是否版本号已被处理(手动修改并提交)
+  let versionAlreadyHandled = false;
+  
   // 检查版本号是否被手动修改
   const versionStatus = checkVersionModified();
   if (versionStatus.modified) {
@@ -87,9 +90,10 @@ const main = async () => {
     console.log('⚠️                                              ⚠️');
     console.log('⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️');
     
-    const answer = await getUserInput('\n是否要先提交这个手动修改的版本号? (y/n): ');
+    const answer = await getUserInput('\n是否使用这个手动修改的版本号? (y/n): ');
     if (answer.toLowerCase() === 'y') {
       try {
+        versionAlreadyHandled = true; // 标记版本已处理
         execSync('git add package.json', { stdio: 'inherit' });
         execSync(`git commit -m "chore: 手动更新版本号至 v${currentVersion}"`, { stdio: 'inherit' });
         console.log(`✅ 已提交手动修改的版本号 v${currentVersion}`);
@@ -130,14 +134,21 @@ const main = async () => {
     }
   }
 
-  // 更新版本
-  console.log(`当前版本: ${currentVersion}`);
-  execSync(`npm version ${versionArg} --no-git-tag-version`, { stdio: 'inherit' });
+  // 只有未手动处理版本的情况下才自动递增版本
+  let newVersion = currentVersion;
+  if (!versionAlreadyHandled) {
+    // 更新版本
+    console.log(`当前版本: ${currentVersion}`);
+    execSync(`npm version ${versionArg} --no-git-tag-version`, { stdio: 'inherit' });
 
-  // 读取新版本
-  const updatedPackageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-  const newVersion = updatedPackageJson.version;
-  console.log(`新版本: ${newVersion}`);
+    // 读取新版本
+    const updatedPackageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    newVersion = updatedPackageJson.version;
+    console.log(`新版本: ${newVersion}`);
+  } else {
+    console.log(`使用手动设置的版本: v${currentVersion}`);
+    newVersion = currentVersion; // 使用手动修改的版本
+  }
 
   // 构建Deno版本文件
   console.log('\n构建 Deno 版本文件...');
@@ -151,7 +162,11 @@ const main = async () => {
 
   // 提交更改并创建标签
   console.log('\n提交更改...');
-  execSync('git add package.json', { stdio: 'inherit' });
+  
+  // 如果版本号已手动处理，则不需要再次添加package.json
+  if (!versionAlreadyHandled) {
+    execSync('git add package.json', { stdio: 'inherit' });
+  }
   
   // 添加构建的deno.js文件
   try {
@@ -181,11 +196,29 @@ const main = async () => {
   console.log('\n当前暂存状态:');
   execSync('git status --short', { stdio: 'inherit' });
   
-  execSync(`git commit -m "chore: 发布 v${newVersion}"`, { stdio: 'inherit' });
-  execSync(`git tag -a v${newVersion} -m "v${newVersion}"`, { stdio: 'inherit' });
+  // 只有在有文件需要提交时才创建提交
+  const hasChangesToCommit = execSync('git status --porcelain --untracked-files=no').toString().trim() !== '';
+  if (hasChangesToCommit || !versionAlreadyHandled) {
+    // 如果是手动设置的版本且已经提交过，就不需要再次提交package.json
+    if (!versionAlreadyHandled) {
+      execSync(`git commit -m "chore: 发布 v${newVersion}"`, { stdio: 'inherit' });
+    } else if (hasChangesToCommit) {
+      // 如果有其他更改（比如deno.js），则创建新的提交
+      execSync(`git commit -m "chore: 构建 v${newVersion} 的部署文件"`, { stdio: 'inherit' });
+    }
+  }
+  
+  // 检查是否已存在相同版本的标签
+  const tagExists = execSync(`git tag -l v${newVersion}`).toString().trim() === `v${newVersion}`;
+  if (!tagExists) {
+    execSync(`git tag -a v${newVersion} -m "v${newVersion}"`, { stdio: 'inherit' });
+    console.log(`✅ 已创建标签 v${newVersion}`);
+  } else {
+    console.log(`⚠️ 标签 v${newVersion} 已存在，跳过标签创建`);
+  }
 
   console.log(`
-✅ 版本已更新为 v${newVersion}
+✅ 版本已设置为 v${newVersion}
 ✅ deno.js 已构建并提交
 
 执行以下命令推送更改并触发构建:
