@@ -1,6 +1,6 @@
 {
   "name": "gemini-party",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "module": "index.ts",
   "dependencies": {
     "@google/genai": "^0.7.0",
@@ -15,10 +15,10 @@
     "start": "bun ./src/index.ts",
     "docker-build": "docker build --pull -t gemini-party .",
     "bun-build": "bun build ./src/index.ts --outfile ./serverless/bun.js --target=node --external hono --external @google/genai --external openai",
-    "deno-build": "bun build ./src/index.ts --outfile ./serverless/deno.js --target=node --external hono --external @google/genai --external openai && node ./script/deno-modify-imports.js",
-    "release": "node ./script/release.js",
-    "release:minor": "node ./script/release.js minor",
-    "release:major": "node ./script/release.js major",
+    "deno-build": "bun build ./src/index.ts --outfile ./serverless/deno.js --target=node --external hono --external @google/genai --external openai && node scripts/deno-modify-imports.js",
+    "release": "node scripts/release.js",
+    "release:minor": "node scripts/release.js minor",
+    "release:major": "node scripts/release.js major",
     "push": "git push && git push --tags"
   },
   "type": "module",
