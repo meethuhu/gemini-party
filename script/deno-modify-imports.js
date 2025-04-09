@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DENO_JS_PATH = path.join(__dirname, '../dist/deno.js');
+const DENO_JS_PATH = path.join(__dirname, '../serverless/deno.js');
 const PACKAGE_JSON_PATH = path.join(__dirname, '../package.json');
 
 // 从 package.json 获取依赖版本
