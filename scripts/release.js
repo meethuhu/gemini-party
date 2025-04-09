@@ -25,6 +25,33 @@ const checkUnstagedChanges = () => {
   }
 };
 
+// 检查package.json版本是否已被手动修改但未提交
+const checkVersionModified = () => {
+  try {
+    // 获取git中记录的最新版本号
+    const gitVersion = execSync('git show HEAD:package.json', { encoding: 'utf8' });
+    try {
+      const gitPackageJson = JSON.parse(gitVersion);
+      const gitPackageVersion = gitPackageJson.version;
+      
+      // 比较git中的版本和当前文件中的版本
+      if (gitPackageVersion !== currentVersion) {
+        return {
+          modified: true,
+          gitVersion: gitPackageVersion,
+          currentVersion
+        };
+      }
+    } catch (parseError) {
+      console.warn('无法解析git中的package.json:', parseError);
+    }
+  } catch (gitError) {
+    console.warn('无法获取git中的package.json版本:', gitError);
+  }
+  
+  return { modified: false };
+};
+
 // 获取用户输入的Promise函数
 const getUserInput = (question) => {
   const rl = readline.createInterface({
@@ -49,6 +76,33 @@ if (!fs.existsSync(serverlessDir)) {
 
 // 主程序
 const main = async () => {
+  // 检查版本号是否被手动修改
+  const versionStatus = checkVersionModified();
+  if (versionStatus.modified) {
+    console.log('\n');
+    console.log('⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️');
+    console.log('⚠️                                              ⚠️');
+    console.log(`⚠️  检测到package.json版本号已被手动修改:      ⚠️`);
+    console.log(`⚠️  Git版本: ${versionStatus.gitVersion}  →  当前版本: ${versionStatus.currentVersion}  ⚠️`);
+    console.log('⚠️                                              ⚠️');
+    console.log('⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️');
+    
+    const answer = await getUserInput('\n是否要先提交这个手动修改的版本号? (y/n): ');
+    if (answer.toLowerCase() === 'y') {
+      try {
+        execSync('git add package.json', { stdio: 'inherit' });
+        execSync(`git commit -m "chore: 手动更新版本号至 v${currentVersion}"`, { stdio: 'inherit' });
+        console.log(`✅ 已提交手动修改的版本号 v${currentVersion}`);
+      } catch (error) {
+        console.error('提交版本号修改失败:', error);
+        process.exit(1);
+      }
+    } else if (answer.toLowerCase() !== 'n') {
+      console.log('❌ 发布取消');
+      process.exit(0);
+    }
+  }
+
   // 检查未暂存的文件
   if (checkUnstagedChanges()) {
     console.log('\n');
@@ -119,7 +173,7 @@ const main = async () => {
     const answer = await getUserInput('\n无法添加 deno.js，是否继续提交? (y/n): ');
     if (answer.toLowerCase() !== 'y') {
       console.log('❌ 发布取消');
-      process.exit(1);
+      process.exit(0);
     }
   }
   
