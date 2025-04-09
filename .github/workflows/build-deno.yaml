@@ -1,0 +1,45 @@
+name: Build Deno Version
+
+on:
+  push:
+    # branches:
+    #   - main
+    tags:
+      - 'v*'
+
+jobs:
+  build-deno:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Build Deno version
+        run: bun run deno-build
+      
+      - name: Upload Deno artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deno-build
+          path: ./serverless/deno.js
+          retention-days: 30
+      
+      # 如果是从标签推送，则创建一个发布并附加文件
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./serverless/deno.js
+          draft: false
+          prerelease: false
+          generate_release_notes: true
