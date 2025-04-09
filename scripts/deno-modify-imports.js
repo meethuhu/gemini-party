@@ -82,11 +82,29 @@ try {
     content = versionComment + content;
   }
   
-  // 直接替换版本占位符
-  content = content.replace(
-    /const\s+version\s*=\s*(['"])0\.0\.0\1;\s*\/\/\s*BUILD_VERSION_PLACEHOLDER/g,
-    `const version = '${pkgInfo.version}'; // 自动构建于 ${new Date().toISOString()}`
-  );
+  // 更新版本号 - 增强匹配能力，处理var和const两种情况
+  const versionReplacePattern = /(?:var|const|let)\s+version\s*=\s*(['"])0\.0\.0\1;/g;
+  
+  if (content.match(versionReplacePattern)) {
+    console.log('找到版本号占位符，正在替换...');
+    content = content.replace(
+      versionReplacePattern,
+      `var version = '${pkgInfo.version}'; // 自动构建于 ${new Date().toISOString()}`
+    );
+  } else {
+    console.warn('警告: 未找到版本号占位符。手动搜索version变量并替换...');
+    
+    // 尝试查找配置对象中的version定义
+    const configVersionPattern = /(var|const|let)\s+config\s*=\s*\{\s*[\r\n\s]*version\s*,/;
+    const match = content.match(configVersionPattern);
+    
+    if (match) {
+      // 找到config对象，搜索最近的version变量
+      const versionDefinePattern = /(var|const|let)\s+version\s*=\s*(['"])([^'"]*)\2;/;
+      content = content.replace(versionDefinePattern, 
+        `$1 version = '${pkgInfo.version}'; // 自动构建于 ${new Date().toISOString()}`);
+    }
+  }
   
   // 写回文件
   fs.writeFileSync(DENO_JS_PATH, content, 'utf8');
