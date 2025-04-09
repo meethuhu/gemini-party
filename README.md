@@ -1,7 +1,15 @@
 # Gemini Party
 
-Gemini Party 是一个基于 [Hono](https://github.com/honojs/hono) 的轻量级 Gemini API 代理服务，支持轮询负载均衡
-，同时支持 Gemini API 格式和 OpenAI 兼容格式的 API 调用。
+Gemini Party 是一个高效、可靠的 Gemini API 代理服务，基于 [Hono](https://github.com/honojs/hono) 构建。它提供智能的 API 密钥轮询负载均衡、自动错误重试和黑名单机制，支持 Gemini 原生 API 和 OpenAI 兼容格式调用，帮助您高效管理和使用多个 Gemini API 密钥。
+
+## ✨ 核心特性
+
+- **智能负载均衡**: 自动在多个 API 密钥之间进行智能轮询
+- **自动重试机制**: 当 API 不可用时自动重试并暂时加入黑名单
+- **双格式支持**: 同时兼容 Gemini API 原生格式和 OpenAI 兼容格式
+- **密钥监控**: 提供实时 API 密钥使用状态监控和统计
+- **轻量高效**: 基于 Hono 构建，性能卓越，资源占用低
+- **简单部署**: 支持 Docker、Deno Deploy 等多种部署方式
 
 ## 💻 支持平台
 
@@ -21,8 +29,7 @@ Gemini Party 是一个基于 [Hono](https://github.com/honojs/hono) 的轻量级
 
 ### <img src="public/openai.svg" alt="openai-icon" width="20" style="transform: translateY(.3rem)"> OpenAI 兼容格式
 
-对于 OpenAI 格式的请求使用 `OpenAI SDK`，但是Google对于OpenAI格式的支持仍处于Beta阶段，所有有些功能无法实现，比如 Safety
-settings 和 Gemini 2.0 Flash 的图文生成，
+对于 OpenAI 格式的请求使用 `OpenAI SDK`，但是 Google 对于 OpenAI 格式的支持仍处于 Beta 阶段，部分功能受限，例如 Safety settings 和 Gemini 2.0 Flash 的图文生成等。
 
 - `POST /v1/chat/completions` - 创建聊天补全
 - `POST /v1/embeddings` - 创建文本嵌入
@@ -177,6 +184,14 @@ curl -X POST "http://localhost:2333/v1/embeddings" \
   }'
 ```
 
+### 获取负载均衡状态
+
+```bash
+# 查看API密钥使用情况和负载状态
+curl "http://localhost:2333/rotation-status" \
+  -H "Authorization: Bearer sk-test-1234567890"
+```
+
 ## 📋 项目结构
 
 ```
@@ -186,7 +201,7 @@ gemini-party/
 │   │   ├── gemini.ts     # Gemini 原生格式接口实现
 │   │   └── openai.ts     # OpenAI 兼容格式接口实现
 │   ├── utils/
-│   │   ├── apikey.ts     # API密钥与轮询
+│   │   ├── apikey.ts     # API密钥轮询与负载均衡
 │   │   ├── config.ts     # 配置管理
 │   │   ├── error.ts      # 错误处理
 │   │   ├── middleware.ts # 认证中间件
