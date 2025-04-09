@@ -7,6 +7,11 @@ on:
     tags:
       - 'v*'
 
+# 声明需要的权限
+permissions:
+  contents: read
+  packages: write  # 允许写入包(发布到GHCR)
+
 jobs:
   docker:
     runs-on: ubuntu-latest
