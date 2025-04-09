@@ -36,3 +36,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # 测试文件夹
 test-temp
 
+# 允许提交构建文件
+!serverless/
+!serverless/*
+

@@ -98,12 +98,41 @@ const main = async () => {
   // 提交更改并创建标签
   console.log('\n提交更改...');
   execSync('git add package.json', { stdio: 'inherit' });
+  
+  // 添加构建的deno.js文件
+  try {
+    console.log('添加 deno.js 到暂存区...');
+    if (fs.existsSync(path.join(serverlessDir, 'deno.js'))) {
+      try {
+        execSync('git add serverless/deno.js', { stdio: 'inherit' });
+        console.log('✅ deno.js 已添加到暂存区');
+      } catch (error) {
+        console.warn('⚠️ 无法直接添加deno.js文件，尝试强制添加...');
+        execSync('git add -f serverless/deno.js', { stdio: 'inherit' });
+        console.log('✅ deno.js 已强制添加到暂存区');
+      }
+    } else {
+      console.warn('⚠️ deno.js 文件不存在，无法添加');
+    }
+  } catch (error) {
+    console.error('❌ 添加 deno.js 失败:', error.message);
+    const answer = await getUserInput('\n无法添加 deno.js，是否继续提交? (y/n): ');
+    if (answer.toLowerCase() !== 'y') {
+      console.log('❌ 发布取消');
+      process.exit(1);
+    }
+  }
+  
+  // 检查git状态，确认文件已添加
+  console.log('\n当前暂存状态:');
+  execSync('git status --short', { stdio: 'inherit' });
+  
   execSync(`git commit -m "chore: 发布 v${newVersion}"`, { stdio: 'inherit' });
   execSync(`git tag -a v${newVersion} -m "v${newVersion}"`, { stdio: 'inherit' });
 
   console.log(`
 ✅ 版本已更新为 v${newVersion}
-✅ deno.js 已构建完成
+✅ deno.js 已构建并提交
 
 执行以下命令推送更改并触发构建:
   git push && git push --tags
