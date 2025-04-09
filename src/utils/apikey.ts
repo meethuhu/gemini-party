@@ -367,7 +367,6 @@ export async function getRotationStatus(): Promise<{
         };
     }>;
 }> {
-    const modelRotations = await getModelRotations();
     const lastResetTime = await getLastResetTime();
     const nextResetTime = lastResetTime + ROTATION_RESET_INTERVAL;
     const now = Date.now();

@@ -7,6 +7,9 @@ import { createHonoErrorResponse } from "./utils/error";
 import validateHarmCategories from "./utils/safety";
 import { config } from './utils/config';
 
+// 启动时打印版本信息
+console.log(`\n=== Gemini Party v${config.version} 启动中... ===\n`);
+
 const app = new Hono();
 
 // 启动时检测设置
@@ -24,6 +27,7 @@ app.get(API_PREFIX + '/rotation-status', async (c) => {
         const status = await getRotationStatus();
         return c.json({
             status: "success",
+            version: config.version,
             data: status
         });
     } catch (error) {

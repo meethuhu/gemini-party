@@ -32,4 +32,6 @@ console.log(`
 
 执行以下命令推送更改并触发构建:
   git push && git push --tags
+或者使用:
+  bun run push
 `);

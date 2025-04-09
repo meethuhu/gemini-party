@@ -1,4 +1,21 @@
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// 读取package.json获取版本号
+let version = '0.0.0';
+try {
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const packageJson = JSON.parse(
+        readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8')
+    );
+    version = packageJson.version;
+} catch (error) {
+    console.warn('无法读取package.json版本信息:', error);
+}
+
 export const config = {
+    version,
     api: {
         GEMINI_API_KEY: process.env.GEMINI_API_KEY,
         AUTH_TOKEN: process.env.AUTH_TOKEN,

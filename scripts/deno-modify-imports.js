@@ -50,11 +50,31 @@ try {
     console.log(`替换 ${from} -> ${to}`);
   });
   
+  // 添加版本号注释到文件开头
+  const packageJson = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, 'utf8'));
+  const version = packageJson.version;
+
+  const versionComment = `/**
+   * Gemini Party v${version}
+   * 构建时间: ${new Date().toISOString()}
+   * https://github.com/${process.env.GITHUB_REPOSITORY || 'your-username/gemini-party'}
+   */
+
+  `;
+
+  if (content.startsWith('/**\n * Gemini Party v')) {
+    // 替换现有的版本注释块
+    content = content.replace(/\/\*\*[\s\S]*?\*\/\s*/, versionComment);
+  } else {
+    content = versionComment + content;
+  }
+
   // 写回文件
   fs.writeFileSync(DENO_JS_PATH, content, 'utf8');
   
   console.log('导入语句修改完成！');
+  console.log(`✅ Deno 构建文件已添加版本 v${version} 信息`);
 } catch (error) {
   console.error('修改导入语句时出错:', error);
   process.exit(1);
-} 
+}
