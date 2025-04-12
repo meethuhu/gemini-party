@@ -1,6 +1,6 @@
 /**
- * Gemini Party v1.0.2
- * 构建时间: 2025-04-12T07:05:51.931Z
+ * Gemini Party v1.0.3
+ * 构建时间: 2025-04-12T07:12:55.864Z
  * https://github.com/your-username/gemini-party
  */
 
@@ -17,7 +17,7 @@ import OpenAI from "npm:openai@4.92.1";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-var version = '1.0.2'; // 自动构建于 2025-04-12T07:05:51.932Z
+var version = '1.0.3'; // 自动构建于 2025-04-12T07:12:55.864Z
 try {
   if (typeof Deno === "undefined") {
     const __filename2 = fileURLToPath(import.meta.url);
