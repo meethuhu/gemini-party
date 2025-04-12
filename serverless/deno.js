@@ -1,6 +1,6 @@
 /**
- * Gemini Party v1.0.1
- * 构建时间: 2025-04-09T06:27:01.520Z
+ * Gemini Party v1.0.2
+ * 构建时间: 2025-04-12T07:05:51.931Z
  * https://github.com/your-username/gemini-party
  */
 
@@ -17,7 +17,7 @@ import OpenAI from "npm:openai@4.92.1";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-var version = '1.0.1'; // 自动构建于 2025-04-09T06:27:01.520Z
+var version = '1.0.2'; // 自动构建于 2025-04-12T07:05:51.932Z
 try {
   if (typeof Deno === "undefined") {
     const __filename2 = fileURLToPath(import.meta.url);
@@ -55,38 +55,30 @@ var config = {
 
 // src/utils/kv/deno-store.ts
 class DenoKVStore {
-  kv = null;
+  kv;
   constructor() {
+    if (typeof Deno === "undefined" || !Deno.openKv) {
+      throw new Error("当前环境不支持Deno KV");
+    }
+    this._initPromise = this._init();
+  }
+  _initPromise;
+  async _init() {
     try {
-      Deno.openKv?.().then((kv) => {
-        this.kv = kv;
-      }).catch((error) => {
-        console.error("无法初始化Deno KV存储:", error);
-      });
+      this.kv = await Deno.openKv();
     } catch (error) {
-      console.error("无法初始化Deno KV存储:", error);
+      throw new Error(`无法初始化Deno KV: ${error instanceof Error ? error.message : "未知错误"}`);
     }
   }
   async get(key) {
-    if (!this.kv)
-      return null;
-    try {
-      const result = await this.kv.get([key]);
-      return result?.value || null;
-    } catch (error) {
-      console.error(`Deno KV get错误 (${key}):`, error);
-      return null;
-    }
+    await this._initPromise;
+    const result = await this.kv.get([key]);
+    return result?.value || null;
   }
   async set(key, value, options) {
-    if (!this.kv)
-      return;
-    try {
-      const opts = options?.expireIn ? { expireIn: options.expireIn } : undefined;
-      await this.kv.set([key], value, opts);
-    } catch (error) {
-      console.error(`Deno KV set错误 (${key}):`, error);
-    }
+    await this._initPromise;
+    const opts = options?.expireIn ? { expireIn: options.expireIn } : undefined;
+    await this.kv.set([key], value, opts);
   }
   getType() {
     return "DenoKV";
@@ -110,6 +102,12 @@ class MemoryKVStore {
       }
     });
   }
+  destroy() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+  }
   async get(key) {
     if (this.expiryMap.has(key)) {
       const expiryTime = this.expiryMap.get(key);
@@ -119,14 +117,36 @@ class MemoryKVStore {
         return null;
       }
     }
-    return this.store.get(key);
+    return this.store.get(key) ?? null;
   }
   async set(key, value, options) {
     this.store.set(key, value);
     if (options?.expireIn) {
       const expiryTime = Date.now() + options.expireIn;
       this.expiryMap.set(key, expiryTime);
+    } else {
+      this.expiryMap.delete(key);
     }
+  }
+  async delete(key) {
+    this.expiryMap.delete(key);
+    return this.store.delete(key);
+  }
+  async getMany(keys) {
+    const result = {};
+    for (const key of keys) {
+      result[key] = await this.get(key);
+    }
+    return result;
+  }
+  async setMany(entries, options) {
+    for (const [key, value] of Object.entries(entries)) {
+      await this.set(key, value, options);
+    }
+  }
+  async clear() {
+    this.store.clear();
+    this.expiryMap.clear();
   }
   getType() {
     return "MemoryKV";
@@ -134,273 +154,336 @@ class MemoryKVStore {
 }
 
 // src/utils/kv/index.ts
-function createKVStore() {
-  try {
-    if (typeof Deno !== "undefined" && Deno.openKv) {
-      return new DenoKVStore;
+var isDenoEnv = () => typeof Deno !== "undefined" && Deno.openKv !== undefined;
+async function createKVStore(options) {
+  if (options?.type === "memory") {
+    return new MemoryKVStore;
+  }
+  if (options?.type === "deno") {
+    if (!isDenoEnv()) {
+      throw new Error("当前环境不支持Deno KV");
     }
-  } catch (e) {}
-  return new MemoryKVStore;
+    return new DenoKVStore;
+  }
+  return isDenoEnv() ? new DenoKVStore : new MemoryKVStore;
 }
-var kvStore = createKVStore();
+var defaultKVStore = null;
+async function getKVStore() {
+  if (!defaultKVStore) {
+    defaultKVStore = await createKVStore();
+  }
+  return defaultKVStore;
+}
+var kvStore = new MemoryKVStore;
+if (isDenoEnv()) {
+  createKVStore({ type: "deno" }).then((store) => {
+    Object.assign(kvStore, store);
+    console.log("已自动切换到Deno KV存储");
+  }).catch((error) => {
+    console.warn("无法初始化Deno KV存储:", error);
+  });
+}
 
 // src/utils/apikey.ts
-var KV_PREFIX = config.keyManagement.kvPrefix;
-var MODEL_ROTATION_KEY = `${KV_PREFIX}:model_rotations`;
-var LAST_RESET_KEY = `${KV_PREFIX}:last_reset_time`;
-var MODEL_USAGE_KEY = `${KV_PREFIX}:model_usages`;
-var KEY_BLACKLIST_KEY = `${KV_PREFIX}:key_blacklist`;
-var ROTATION_RESET_INTERVAL = config.keyManagement.rotationResetInterval;
-var BLACKLIST_TIMEOUT = config.keyManagement.blacklistTimeout;
-function parseApiKeys() {
-  const apiKeyArray = config.api.GEMINI_API_KEY;
-  if (!apiKeyArray) {
-    throw new Error("GEMINI_API_KEY not set correctly");
+class ApiKeyManager {
+  apiKeys;
+  kvPrefix;
+  rotationResetInterval;
+  blacklistTimeout;
+  kvStore = null;
+  initPromise;
+  MODEL_ROTATION_KEY;
+  LAST_RESET_KEY;
+  MODEL_USAGE_KEY;
+  KEY_BLACKLIST_KEY;
+  constructor(configObj = config) {
+    this.apiKeys = this.parseApiKeys(configObj.api.GEMINI_API_KEY);
+    this.kvPrefix = configObj.keyManagement.kvPrefix;
+    this.rotationResetInterval = configObj.keyManagement.rotationResetInterval;
+    this.blacklistTimeout = configObj.keyManagement.blacklistTimeout;
+    this.MODEL_ROTATION_KEY = `${this.kvPrefix}:model_rotations`;
+    this.LAST_RESET_KEY = `${this.kvPrefix}:last_reset_time`;
+    this.MODEL_USAGE_KEY = `${this.kvPrefix}:model_usages`;
+    this.KEY_BLACKLIST_KEY = `${this.kvPrefix}:key_blacklist`;
+    this.initPromise = this.initializeKVStore();
   }
-  return apiKeyArray.split(",").map((key) => key.trim()).filter(Boolean);
-}
-var geminiApiKeys = parseApiKeys();
-async function getLastResetTime() {
-  const lastReset = await kvStore.get(LAST_RESET_KEY);
-  if (!lastReset) {
-    const now = Date.now();
-    await kvStore.set(LAST_RESET_KEY, now);
-    return now;
-  }
-  return lastReset;
-}
-async function getModelRotations() {
-  const rotations = await kvStore.get(MODEL_ROTATION_KEY);
-  const lastReset = await getLastResetTime();
-  const now = Date.now();
-  const timeSinceReset = now - lastReset;
-  if (timeSinceReset > ROTATION_RESET_INTERVAL) {
-    await kvStore.set(LAST_RESET_KEY, now);
-    await kvStore.set(MODEL_USAGE_KEY, {});
-    return {};
-  }
-  return rotations || {};
-}
-async function saveModelRotation(model, index) {
-  const rotations = await getModelRotations();
-  rotations[model] = index;
-  await kvStore.set(MODEL_ROTATION_KEY, rotations, { expireIn: ROTATION_RESET_INTERVAL });
-}
-async function getApiKeyUsage() {
-  const usages = await kvStore.get(MODEL_USAGE_KEY);
-  return usages || {};
-}
-async function recordApiKeyUsage(model, keyIndex) {
-  const usages = await getApiKeyUsage();
-  if (!usages[model]) {
-    usages[model] = {};
-  }
-  const keyId = keyIndex.toString();
-  usages[model][keyId] = (usages[model][keyId] || 0) + 1;
-  await kvStore.set(MODEL_USAGE_KEY, usages, { expireIn: ROTATION_RESET_INTERVAL });
-}
-async function getBlacklist() {
-  const blacklist = await kvStore.get(KEY_BLACKLIST_KEY);
-  return blacklist || {};
-}
-async function blacklistApiKey(model, keyIndex) {
-  const blacklist = await getBlacklist();
-  if (!blacklist[model]) {
-    blacklist[model] = {};
-  }
-  const keyId = keyIndex.toString();
-  blacklist[model][keyId] = Date.now();
-  await kvStore.set(KEY_BLACKLIST_KEY, blacklist, { expireIn: BLACKLIST_TIMEOUT });
-  console.warn(`已将密钥 #${keyIndex} 加入 ${model} 模型的黑名单，将在 ${BLACKLIST_TIMEOUT / 60000} 分钟后恢复`);
-}
-async function getApiKey(model = undefined, retryCount = 0, options = { recordUsage: true }) {
-  if (model === undefined) {
-    return { key: geminiApiKeys[0] || "", index: 0 };
-  }
-  if (retryCount >= geminiApiKeys.length) {
-    console.error(`所有密钥都已尝试，模型 ${model} 无可用密钥`);
-    return { key: geminiApiKeys[0] || "", index: 0 };
-  }
-  const blacklist = await getBlacklist();
-  const modelBlacklist = blacklist[model] || {};
-  const now = Date.now();
-  let hasExpiredItems = false;
-  Object.entries(modelBlacklist).forEach(([keyId, timestamp]) => {
-    if (now - timestamp > BLACKLIST_TIMEOUT) {
-      delete modelBlacklist[keyId];
-      hasExpiredItems = true;
-    }
-  });
-  if (hasExpiredItems) {
-    blacklist[model] = modelBlacklist;
-    await kvStore.set(KEY_BLACKLIST_KEY, blacklist, { expireIn: BLACKLIST_TIMEOUT });
-  }
-  const usages = await getApiKeyUsage();
-  const modelUsage = usages[model] || {};
-  let leastUsedIndex = -1;
-  let leastUsageCount = Infinity;
-  for (let i = 0;i < geminiApiKeys.length; i++) {
-    if (modelBlacklist[i.toString()]) {
-      continue;
-    }
-    const usageCount = modelUsage[i.toString()] || 0;
-    if (usageCount < leastUsageCount) {
-      leastUsageCount = usageCount;
-      leastUsedIndex = i;
-    }
-  }
-  if (leastUsedIndex === -1) {
-    const rotations = await getModelRotations();
-    let currentIndex = rotations[model] || 0;
-    currentIndex = currentIndex % geminiApiKeys.length;
-    await saveModelRotation(model, currentIndex + 1);
-    return { key: geminiApiKeys[currentIndex] || "", index: currentIndex };
-  }
-  if (options.recordUsage) {
-    await recordApiKeyUsage(model, leastUsedIndex);
-  }
-  return { key: geminiApiKeys[leastUsedIndex] || "", index: leastUsedIndex };
-}
-async function withRetry(model, apiCallFn, options = {}) {
-  const balancingOptions = {
-    recordUsage: options.recordUsage ?? true,
-    useBlacklist: options.useBlacklist ?? true,
-    maxRetries: options.maxRetries ?? Math.min(config.keyManagement.defaultMaxRetries, geminiApiKeys.length)
-  };
-  let lastError = null;
-  for (let retryCount = 0;retryCount < balancingOptions.maxRetries; retryCount++) {
-    const { key, index } = await getApiKey(model, retryCount, {
-      recordUsage: balancingOptions.recordUsage
-    });
+  async initializeKVStore() {
     try {
-      return await apiCallFn(key);
+      this.kvStore = await getKVStore();
     } catch (error) {
-      console.error(`API调用失败 (模型: ${model}, 密钥索引: ${index}, 重试: ${retryCount + 1}/${balancingOptions.maxRetries}):`, error.message || error);
-      if (balancingOptions.useBlacklist && isRetryableError(error)) {
-        await blacklistApiKey(model, index);
-        lastError = error;
-        continue;
-      }
+      console.error("初始化KV存储失败:", error);
       throw error;
     }
   }
-  throw lastError || new Error(`所有API密钥都已尝试但请求失败 (模型: ${model})`);
-}
-async function withoutBalancing(apiCallFn) {
-  const { key } = await getApiKey(undefined, 0, { recordUsage: false });
-  try {
-    return await apiCallFn(key);
-  } catch (error) {
-    console.error("非负载均衡API调用失败:", error);
-    throw error;
-  }
-}
-function isRetryableError(error) {
-  const errorMessage = String(error.message || error).toLowerCase();
-  if (errorMessage.includes("api key not valid") || errorMessage.includes("quota exceeded") || errorMessage.includes("rate limit") || errorMessage.includes("too many requests")) {
-    return true;
-  }
-  if (error.status) {
-    return error.status >= 500 && error.status < 600;
-  }
-  if (error.code) {
-    return [
-      "ECONNRESET",
-      "ETIMEDOUT",
-      "ECONNABORTED",
-      "EHOSTUNREACH",
-      "ENETUNREACH"
-    ].includes(error.code);
-  }
-  return false;
-}
-async function getRotationStatus() {
-  const lastResetTime = await getLastResetTime();
-  const nextResetTime = lastResetTime + ROTATION_RESET_INTERVAL;
-  const now = Date.now();
-  const remainingTime = nextResetTime - now;
-  const modelUsages = await getApiKeyUsage();
-  const blacklist = await getBlacklist();
-  const keys = [];
-  const modelStats = [];
-  const modelSet = new Set;
-  Object.keys(modelUsages).forEach((model) => modelSet.add(model));
-  for (let i = 0;i < geminiApiKeys.length; i++) {
-    const keyIndex = i.toString();
-    const keyStatus = isKeyBlacklisted(keyIndex, blacklist) ? "blacklisted" : "active";
-    let totalUsage = 0;
-    const byModel = {};
-    modelSet.forEach((model) => {
-      const usage = (modelUsages[model] || {})[keyIndex] || 0;
-      byModel[model] = usage;
-      totalUsage += usage;
-    });
-    const keyInfo = {
-      index: i,
-      status: keyStatus,
-      usage: {
-        total: totalUsage,
-        byModel
-      }
-    };
-    if (keyStatus === "blacklisted") {
-      const blacklistedModels = [];
-      let earliestExpiry = Infinity;
-      Object.entries(blacklist).forEach(([model, keyMap]) => {
-        if (keyMap && keyMap[keyIndex]) {
-          blacklistedModels.push(model);
-          const expiryTime = keyMap[keyIndex] + BLACKLIST_TIMEOUT;
-          earliestExpiry = Math.min(earliestExpiry, expiryTime);
-        }
-      });
-      keys.push({
-        ...keyInfo,
-        blacklistInfo: {
-          models: blacklistedModels,
-          expiresAt: earliestExpiry,
-          remainingTime: Math.max(0, earliestExpiry - now)
-        }
-      });
-    } else {
-      keys.push(keyInfo);
+  async ensureKVStore() {
+    await this.initPromise;
+    if (!this.kvStore) {
+      throw new Error("KV存储未初始化");
     }
+    return this.kvStore;
   }
-  modelSet.forEach((model) => {
-    const usage = modelUsages[model] || {};
-    let totalRequests = 0;
-    const keyDistribution = {};
-    Object.entries(usage).forEach(([keyIndex, count]) => {
-      totalRequests += count;
-      keyDistribution[keyIndex] = count;
+  parseApiKeys(apiKeyInput) {
+    if (!apiKeyInput) {
+      throw new Error("GEMINI_API_KEY not set correctly");
+    }
+    return apiKeyInput.split(",").map((key) => key.trim()).filter(Boolean);
+  }
+  async getLastResetTime() {
+    const kvStore2 = await this.ensureKVStore();
+    const lastReset = await kvStore2.get(this.LAST_RESET_KEY);
+    if (!lastReset) {
+      const now = Date.now();
+      await kvStore2.set(this.LAST_RESET_KEY, now);
+      return now;
+    }
+    return lastReset;
+  }
+  async getModelRotations() {
+    const kvStore2 = await this.ensureKVStore();
+    const rotations = await kvStore2.get(this.MODEL_ROTATION_KEY);
+    const lastReset = await this.getLastResetTime();
+    const now = Date.now();
+    const timeSinceReset = now - lastReset;
+    if (timeSinceReset > this.rotationResetInterval) {
+      await kvStore2.set(this.LAST_RESET_KEY, now);
+      await kvStore2.set(this.MODEL_USAGE_KEY, {});
+      return {};
+    }
+    return rotations || {};
+  }
+  async saveModelRotation(model, index) {
+    const kvStore2 = await this.ensureKVStore();
+    const rotations = await this.getModelRotations();
+    rotations[model] = index;
+    await kvStore2.set(this.MODEL_ROTATION_KEY, rotations, { expireIn: this.rotationResetInterval });
+  }
+  async getApiKeyUsage() {
+    const kvStore2 = await this.ensureKVStore();
+    const usages = await kvStore2.get(this.MODEL_USAGE_KEY);
+    return usages || {};
+  }
+  async recordApiKeyUsage(model, keyIndex) {
+    const kvStore2 = await this.ensureKVStore();
+    const usages = await this.getApiKeyUsage();
+    if (!usages[model]) {
+      usages[model] = {};
+    }
+    const keyId = keyIndex.toString();
+    usages[model][keyId] = (usages[model][keyId] || 0) + 1;
+    await kvStore2.set(this.MODEL_USAGE_KEY, usages, { expireIn: this.rotationResetInterval });
+  }
+  async getBlacklist() {
+    const kvStore2 = await this.ensureKVStore();
+    const blacklist = await kvStore2.get(this.KEY_BLACKLIST_KEY);
+    return blacklist || {};
+  }
+  async blacklistApiKey(model, keyIndex) {
+    const kvStore2 = await this.ensureKVStore();
+    const blacklist = await this.getBlacklist();
+    if (!blacklist[model]) {
+      blacklist[model] = {};
+    }
+    const keyId = keyIndex.toString();
+    blacklist[model][keyId] = Date.now();
+    await kvStore2.set(this.KEY_BLACKLIST_KEY, blacklist, { expireIn: this.blacklistTimeout });
+    console.warn(`已将密钥 #${keyIndex} 加入 ${model} 模型的黑名单，将在 ${this.blacklistTimeout / 60000} 分钟后恢复`);
+  }
+  async getApiKey(model = undefined, retryCount = 0, options = { recordUsage: true }) {
+    if (model === undefined) {
+      return { key: this.apiKeys[0] || "", index: 0 };
+    }
+    if (retryCount >= this.apiKeys.length) {
+      console.error(`所有密钥都已尝试，模型 ${model} 无可用密钥`);
+      return { key: this.apiKeys[0] || "", index: 0 };
+    }
+    const blacklist = await this.getBlacklist();
+    const modelBlacklist = blacklist[model] || {};
+    const now = Date.now();
+    let hasExpiredItems = false;
+    Object.entries(modelBlacklist).forEach(([keyId, timestamp]) => {
+      if (now - timestamp > this.blacklistTimeout) {
+        delete modelBlacklist[keyId];
+        hasExpiredItems = true;
+      }
     });
-    modelStats.push({
-      name: model,
-      totalRequests,
-      keyDistribution
-    });
-  });
-  const blacklistedKeys = keys.filter((k) => k.status === "blacklisted").length;
-  return {
-    summary: {
-      totalKeys: geminiApiKeys.length,
-      activeKeys: geminiApiKeys.length - blacklistedKeys,
-      blacklistedKeys,
-      resetIn: remainingTime,
-      kvType: kvStore.getType()
-    },
-    modelStats,
-    keys
-  };
-}
-function isKeyBlacklisted(keyIndex, blacklist) {
-  for (const model in blacklist) {
-    const modelBlacklist = blacklist[model];
-    if (modelBlacklist && modelBlacklist[keyIndex]) {
+    if (hasExpiredItems) {
+      blacklist[model] = modelBlacklist;
+      await this.ensureKVStore().then((kvStore2) => kvStore2.set(this.KEY_BLACKLIST_KEY, blacklist, { expireIn: this.blacklistTimeout }));
+    }
+    const usages = await this.getApiKeyUsage();
+    const modelUsage = usages[model] || {};
+    let leastUsedIndex = -1;
+    let leastUsageCount = Infinity;
+    for (let i = 0;i < this.apiKeys.length; i++) {
+      if (modelBlacklist[i.toString()]) {
+        continue;
+      }
+      const usageCount = modelUsage[i.toString()] || 0;
+      if (usageCount < leastUsageCount) {
+        leastUsageCount = usageCount;
+        leastUsedIndex = i;
+      }
+    }
+    if (leastUsedIndex === -1) {
+      const rotations = await this.getModelRotations();
+      let currentIndex = rotations[model] || 0;
+      currentIndex = currentIndex % this.apiKeys.length;
+      await this.saveModelRotation(model, currentIndex + 1);
+      return { key: this.apiKeys[currentIndex] || "", index: currentIndex };
+    }
+    if (options.recordUsage) {
+      await this.recordApiKeyUsage(model, leastUsedIndex);
+    }
+    return { key: this.apiKeys[leastUsedIndex] || "", index: leastUsedIndex };
+  }
+  isRetryableError(error) {
+    const errorMessage = String(error.message || error).toLowerCase();
+    if (errorMessage.includes("api key not valid") || errorMessage.includes("quota exceeded") || errorMessage.includes("rate limit") || errorMessage.includes("too many requests")) {
       return true;
     }
+    if (error.status) {
+      return error.status >= 500 && error.status < 600;
+    }
+    if (error.code) {
+      return [
+        "ECONNRESET",
+        "ETIMEDOUT",
+        "ECONNABORTED",
+        "EHOSTUNREACH",
+        "ENETUNREACH"
+      ].includes(error.code);
+    }
+    return false;
   }
-  return false;
+  async withRetry(model, apiCallFn, options = {}) {
+    const balancingOptions = {
+      recordUsage: options.recordUsage ?? true,
+      useBlacklist: options.useBlacklist ?? true,
+      maxRetries: options.maxRetries ?? Math.min(config.keyManagement.defaultMaxRetries, this.apiKeys.length)
+    };
+    let lastError = null;
+    for (let retryCount = 0;retryCount < balancingOptions.maxRetries; retryCount++) {
+      const { key, index } = await this.getApiKey(model, retryCount, {
+        recordUsage: balancingOptions.recordUsage
+      });
+      try {
+        return await apiCallFn(key);
+      } catch (error) {
+        console.error(`API调用失败 (模型: ${model}, 密钥索引: ${index}, 重试: ${retryCount + 1}/${balancingOptions.maxRetries}):`, error.message || error);
+        if (balancingOptions.useBlacklist && this.isRetryableError(error)) {
+          await this.blacklistApiKey(model, index);
+          lastError = error;
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw lastError || new Error(`所有API密钥都已尝试但请求失败 (模型: ${model})`);
+  }
+  async withoutBalancing(apiCallFn) {
+    const { key } = await this.getApiKey(undefined, 0, { recordUsage: false });
+    try {
+      return await apiCallFn(key);
+    } catch (error) {
+      console.error("非负载均衡API调用失败:", error);
+      throw error;
+    }
+  }
+  async getRotationStatus() {
+    const kvStore2 = await this.ensureKVStore();
+    const lastResetTime = await this.getLastResetTime();
+    const nextResetTime = lastResetTime + this.rotationResetInterval;
+    const now = Date.now();
+    const remainingTime = nextResetTime - now;
+    const modelUsages = await this.getApiKeyUsage();
+    const blacklist = await this.getBlacklist();
+    const keys = [];
+    const modelStats = [];
+    const modelSet = new Set;
+    Object.keys(modelUsages).forEach((model) => modelSet.add(model));
+    for (let i = 0;i < this.apiKeys.length; i++) {
+      const keyIndex = i.toString();
+      const keyStatus = this.isKeyBlacklisted(keyIndex, blacklist) ? "blacklisted" : "active";
+      let totalUsage = 0;
+      const byModel = {};
+      modelSet.forEach((model) => {
+        const usage = (modelUsages[model] || {})[keyIndex] || 0;
+        byModel[model] = usage;
+        totalUsage += usage;
+      });
+      const keyInfo = {
+        index: i,
+        status: keyStatus,
+        usage: {
+          total: totalUsage,
+          byModel
+        }
+      };
+      if (keyStatus === "blacklisted") {
+        const blacklistedModels = [];
+        let earliestExpiry = Infinity;
+        Object.entries(blacklist).forEach(([model, keyMap]) => {
+          if (keyMap && keyMap[keyIndex]) {
+            blacklistedModels.push(model);
+            const expiryTime = keyMap[keyIndex] + this.blacklistTimeout;
+            earliestExpiry = Math.min(earliestExpiry, expiryTime);
+          }
+        });
+        keys.push({
+          ...keyInfo,
+          blacklistInfo: {
+            models: blacklistedModels,
+            expiresAt: earliestExpiry,
+            remainingTime: Math.max(0, earliestExpiry - now)
+          }
+        });
+      } else {
+        keys.push(keyInfo);
+      }
+    }
+    modelSet.forEach((model) => {
+      const usage = modelUsages[model] || {};
+      let totalRequests = 0;
+      const keyDistribution = {};
+      Object.entries(usage).forEach(([keyIndex, count]) => {
+        totalRequests += count;
+        keyDistribution[keyIndex] = count;
+      });
+      modelStats.push({
+        name: model,
+        totalRequests,
+        keyDistribution
+      });
+    });
+    const blacklistedKeys = keys.filter((k) => k.status === "blacklisted").length;
+    return {
+      summary: {
+        totalKeys: this.apiKeys.length,
+        activeKeys: this.apiKeys.length - blacklistedKeys,
+        blacklistedKeys,
+        resetIn: remainingTime,
+        kvType: kvStore2.getType()
+      },
+      modelStats,
+      keys
+    };
+  }
+  isKeyBlacklisted(keyIndex, blacklist) {
+    for (const model in blacklist) {
+      const modelBlacklist = blacklist[model];
+      if (modelBlacklist && modelBlacklist[keyIndex]) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
+var apiKeyManager = new ApiKeyManager;
+var getApiKey = apiKeyManager.getApiKey.bind(apiKeyManager);
+var blacklistApiKey = apiKeyManager.blacklistApiKey.bind(apiKeyManager);
+var withRetry = apiKeyManager.withRetry.bind(apiKeyManager);
+var withoutBalancing = apiKeyManager.withoutBalancing.bind(apiKeyManager);
+var getRotationStatus = apiKeyManager.getRotationStatus.bind(apiKeyManager);
 
 // src/utils/error.ts
 import { APIError } from "npm:openai@4.92.1";
@@ -853,7 +936,7 @@ var openai_default = oai;
 
 // src/index.ts
 console.log(`
-=== Gemini Party v${config.version} 启动中... ===
+=== Gemini Party v${config.version} ===
 `);
 var app = new Hono3;
 validateHarmCategories();

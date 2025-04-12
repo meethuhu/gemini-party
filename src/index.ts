@@ -8,7 +8,7 @@ import validateHarmCategories from "./utils/safety";
 import { config } from './utils/config';
 
 // 启动时打印版本信息
-console.log(`\n=== Gemini Party v${config.version} 启动中... ===\n`);
+console.log(`\n=== Gemini Party v${config.version} ===\n`);
 
 const app = new Hono();
 
