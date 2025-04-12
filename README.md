@@ -1,7 +1,5 @@
 # Gemini Party
-
-Gemini Party 是一个高效、可靠的 Gemini API 代理服务，基于 [Hono](https://github.com/honojs/hono) 构建。它提供智能的 API 密钥轮询负载均衡、自动错误重试和黑名单机制，支持 Gemini 原生 API 和 OpenAI 兼容格式调用，帮助您高效管理和使用多个 Gemini API 密钥。
-
+Gemini Party 是一个基于 Hono 构建的 Gemini 负载均衡服务。它提供智能负载均衡、自动错误重试和黑名单机制，支持 Gemini 原生 API 和 OpenAI 兼容格式调用。
 ## ✨ 核心特性
 
 - **智能负载均衡**: 自动在多个 API 密钥之间进行智能轮询
