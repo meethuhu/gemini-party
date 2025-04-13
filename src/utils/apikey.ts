@@ -29,7 +29,7 @@ class ApiKeyManager {
         this.kvPrefix = configObj.keyManagement.kvPrefix;
         this.rotationResetInterval = configObj.keyManagement.rotationResetInterval;
         this.blacklistTimeout = configObj.keyManagement.blacklistTimeout;
-        this.selectionStrategy = configObj.keyManagement.KEY_ROTATION_STRATEGY === 'RANDOM' ? 'RANDOM' : 'LEAST_USED';
+        this.selectionStrategy = configObj.keyManagement.KEY_SELECTION_STRATEGY === 'RANDOM' ? 'RANDOM' : 'LEAST_USED';
 
         // 初始化键名
         this.MODEL_ROTATION_KEY = `${this.kvPrefix}:model_rotations`;

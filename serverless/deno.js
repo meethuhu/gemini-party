@@ -43,7 +43,7 @@ var config = {
     rotationResetInterval: Number(process.env.ROTATION_RESET_INTERVAL) || 60000,
     blacklistTimeout: Number(process.env.BLACKLIST_TIMEOUT) || 300000,
     defaultMaxRetries: Number(process.env.DEFAULT_MAX_RETRIES) || 3,
-    KEY_ROTATION_STRATEGY: process.env.KEY_ROTATION_STRATEGY || "LEAST_USED"
+    KEY_SELECTION_STRATEGY: process.env.KEY_SELECTION_STRATEGY || "LEAST_USED"
   },
   safety: {
     HARM_CATEGORY_HARASSMENT: process.env.HARM_CATEGORY_HARASSMENT,
@@ -203,7 +203,7 @@ class ApiKeyManager {
     this.kvPrefix = configObj.keyManagement.kvPrefix;
     this.rotationResetInterval = configObj.keyManagement.rotationResetInterval;
     this.blacklistTimeout = configObj.keyManagement.blacklistTimeout;
-    this.selectionStrategy = configObj.keyManagement.KEY_ROTATION_STRATEGY === "RANDOM" ? "RANDOM" : "LEAST_USED";
+    this.selectionStrategy = configObj.keyManagement.KEY_SELECTION_STRATEGY === "RANDOM" ? "RANDOM" : "LEAST_USED";
     this.MODEL_ROTATION_KEY = `${this.kvPrefix}:model_rotations`;
     this.LAST_RESET_KEY = `${this.kvPrefix}:last_reset_time`;
     this.MODEL_USAGE_KEY = `${this.kvPrefix}:model_usages`;
