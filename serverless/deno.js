@@ -1,6 +1,6 @@
 /**
- * Gemini Party v1.0.2
- * 构建时间: 2025-04-12T07:05:51.931Z
+ * Gemini Party v1.1.0
+ * 构建时间: 2025-04-13T03:50:35.826Z
  * https://github.com/your-username/gemini-party
  */
 
@@ -17,7 +17,7 @@ import OpenAI from "npm:openai@4.92.1";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-var version = '1.0.2'; // 自动构建于 2025-04-12T07:05:51.932Z
+var version = '1.1.0'; // 自动构建于 2025-04-13T03:50:35.827Z
 try {
   if (typeof Deno === "undefined") {
     const __filename2 = fileURLToPath(import.meta.url);
@@ -42,7 +42,8 @@ var config = {
     kvPrefix: "gemini_party_api_rotation",
     rotationResetInterval: Number(process.env.ROTATION_RESET_INTERVAL) || 60000,
     blacklistTimeout: Number(process.env.BLACKLIST_TIMEOUT) || 300000,
-    defaultMaxRetries: Number(process.env.DEFAULT_MAX_RETRIES) || 3
+    defaultMaxRetries: Number(process.env.DEFAULT_MAX_RETRIES) || 3,
+    KEY_ROTATION_STRATEGY: process.env.KEY_ROTATION_STRATEGY || "LEAST_USED"
   },
   safety: {
     HARM_CATEGORY_HARASSMENT: process.env.HARM_CATEGORY_HARASSMENT,
@@ -192,6 +193,7 @@ class ApiKeyManager {
   blacklistTimeout;
   kvStore = null;
   initPromise;
+  selectionStrategy;
   MODEL_ROTATION_KEY;
   LAST_RESET_KEY;
   MODEL_USAGE_KEY;
@@ -201,6 +203,7 @@ class ApiKeyManager {
     this.kvPrefix = configObj.keyManagement.kvPrefix;
     this.rotationResetInterval = configObj.keyManagement.rotationResetInterval;
     this.blacklistTimeout = configObj.keyManagement.blacklistTimeout;
+    this.selectionStrategy = configObj.keyManagement.KEY_ROTATION_STRATEGY === "RANDOM" ? "RANDOM" : "LEAST_USED";
     this.MODEL_ROTATION_KEY = `${this.kvPrefix}:model_rotations`;
     this.LAST_RESET_KEY = `${this.kvPrefix}:last_reset_time`;
     this.MODEL_USAGE_KEY = `${this.kvPrefix}:model_usages`;
@@ -289,6 +292,10 @@ class ApiKeyManager {
     console.warn(`已将密钥 #${keyIndex} 加入 ${model} 模型的黑名单，将在 ${this.blacklistTimeout / 60000} 分钟后恢复`);
   }
   async getApiKey(model = undefined, retryCount = 0, options = { recordUsage: true }) {
+    if (this.apiKeys.length === 0) {
+      console.error("错误：未配置任何 API 密钥 (GEMINI_API_KEY is empty or invalid)");
+      throw new Error("未配置任何 API 密钥");
+    }
     if (model === undefined) {
       return { key: this.apiKeys[0] || "", index: 0 };
     }
@@ -310,31 +317,41 @@ class ApiKeyManager {
       blacklist[model] = modelBlacklist;
       await this.ensureKVStore().then((kvStore2) => kvStore2.set(this.KEY_BLACKLIST_KEY, blacklist, { expireIn: this.blacklistTimeout }));
     }
-    const usages = await this.getApiKeyUsage();
-    const modelUsage = usages[model] || {};
-    let leastUsedIndex = -1;
-    let leastUsageCount = Infinity;
+    const availableKeyIndices = [];
     for (let i = 0;i < this.apiKeys.length; i++) {
-      if (modelBlacklist[i.toString()]) {
-        continue;
-      }
-      const usageCount = modelUsage[i.toString()] || 0;
-      if (usageCount < leastUsageCount) {
-        leastUsageCount = usageCount;
-        leastUsedIndex = i;
+      if (!modelBlacklist[i.toString()]) {
+        availableKeyIndices.push(i);
       }
     }
-    if (leastUsedIndex === -1) {
+    let selectedIndex;
+    if (availableKeyIndices.length === 0) {
+      console.warn(`模型 ${model} 的所有密钥都在黑名单中，将使用传统轮询选择密钥。`);
       const rotations = await this.getModelRotations();
       let currentIndex = rotations[model] || 0;
       currentIndex = currentIndex % this.apiKeys.length;
       await this.saveModelRotation(model, currentIndex + 1);
-      return { key: this.apiKeys[currentIndex] || "", index: currentIndex };
+      selectedIndex = currentIndex;
+    } else if (this.selectionStrategy === "RANDOM") {
+      const randomIndex = Math.floor(Math.random() * availableKeyIndices.length);
+      selectedIndex = availableKeyIndices[randomIndex];
+    } else {
+      const usages = await this.getApiKeyUsage();
+      const modelUsage = usages[model] || {};
+      let leastUsedIndex = -1;
+      let leastUsageCount = Infinity;
+      for (const index of availableKeyIndices) {
+        const usageCount = modelUsage[index.toString()] || 0;
+        if (usageCount < leastUsageCount) {
+          leastUsageCount = usageCount;
+          leastUsedIndex = index;
+        }
+      }
+      selectedIndex = leastUsedIndex !== -1 ? leastUsedIndex : availableKeyIndices[0];
     }
     if (options.recordUsage) {
-      await this.recordApiKeyUsage(model, leastUsedIndex);
+      await this.recordApiKeyUsage(model, selectedIndex);
     }
-    return { key: this.apiKeys[leastUsedIndex] || "", index: leastUsedIndex };
+    return { key: this.apiKeys[selectedIndex], index: selectedIndex };
   }
   isRetryableError(error) {
     const errorMessage = String(error.message || error).toLowerCase();
