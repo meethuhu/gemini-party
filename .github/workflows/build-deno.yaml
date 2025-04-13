@@ -2,8 +2,8 @@ name: Build Deno Version
 
 on:
   push:
-    # branches:
-    #   - main
+    branches:
+      - main
     tags:
       - 'v*'
 
