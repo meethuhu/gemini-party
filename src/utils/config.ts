@@ -35,7 +35,7 @@ export const config = {
         rotationResetInterval: Number(process.env.ROTATION_RESET_INTERVAL) || 60000,
         blacklistTimeout: Number(process.env.BLACKLIST_TIMEOUT) || 300000,
         defaultMaxRetries: Number(process.env.DEFAULT_MAX_RETRIES) || 3,
-        KEY_ROTATION_STRATEGY: process.env.KEY_ROTATION_STRATEGY || 'LEAST_USED' // LEAST_USED, RANDOM
+        KEY_SELECTION_STRATEGY: process.env.KEY_SELECTION_STRATEGY || 'LEAST_USED' // LEAST_USED, RANDOM
     },
     safety: {
         HARM_CATEGORY_HARASSMENT: process.env.HARM_CATEGORY_HARASSMENT,
