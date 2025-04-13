@@ -13,6 +13,7 @@ class ApiKeyManager {
     private blacklistTimeout: number;
     private kvStore: KVStore | null = null;
     private initPromise: Promise<void>;
+    private selectionStrategy: 'LEAST_USED' | 'RANDOM';
 
     // 常量和键名
     private readonly MODEL_ROTATION_KEY: string;
@@ -28,6 +29,7 @@ class ApiKeyManager {
         this.kvPrefix = configObj.keyManagement.kvPrefix;
         this.rotationResetInterval = configObj.keyManagement.rotationResetInterval;
         this.blacklistTimeout = configObj.keyManagement.blacklistTimeout;
+        this.selectionStrategy = configObj.keyManagement.KEY_ROTATION_STRATEGY === 'RANDOM' ? 'RANDOM' : 'LEAST_USED';
 
         // 初始化键名
         this.MODEL_ROTATION_KEY = `${this.kvPrefix}:model_rotations`;
@@ -203,6 +205,12 @@ class ApiKeyManager {
         retryCount: number = 0,
         options: { recordUsage?: boolean } = { recordUsage: true }
     ): Promise<{ key: string, index: number }> {
+        // 处理没有配置 API 密钥的情况
+        if (this.apiKeys.length === 0) {
+            console.error("错误：未配置任何 API 密钥 (GEMINI_API_KEY is empty or invalid)");
+            throw new Error("未配置任何 API 密钥");
+        }
+
         // 没有指定模型时使用简单返回
         if (model === undefined) {
             return { key: this.apiKeys[0] || '', index: 0 };
@@ -211,7 +219,8 @@ class ApiKeyManager {
         // 超过重试次数限制
         if (retryCount >= this.apiKeys.length) {
             console.error(`所有密钥都已尝试，模型 ${model} 无可用密钥`);
-            return { key: this.apiKeys[0] || '', index: 0 };
+            // 即使重试了，也返回第一个密钥
+            return { key: this.apiKeys[0] || '', index: 0 }; 
         }
 
         // 获取当前模型的黑名单
@@ -233,29 +242,19 @@ class ApiKeyManager {
             await this.ensureKVStore().then(kvStore => kvStore.set(this.KEY_BLACKLIST_KEY, blacklist, { expireIn: this.blacklistTimeout }));
         }
 
-        // 获取API密钥使用记录
-        const usages = await this.getApiKeyUsage();
-        const modelUsage = usages[model] || {};
-
-        // 寻找使用频率最低且不在黑名单中的密钥
-        let leastUsedIndex = -1;
-        let leastUsageCount = Infinity;
-
+        // 获取可用密钥索引列表
+        const availableKeyIndices: number[] = [];
         for (let i = 0; i < this.apiKeys.length; i++) {
-            // 跳过黑名单中的密钥
-            if (modelBlacklist[i.toString()]) {
-                continue;
-            }
-
-            const usageCount = modelUsage[i.toString()] || 0;
-            if (usageCount < leastUsageCount) {
-                leastUsageCount = usageCount;
-                leastUsedIndex = i;
+            if (!modelBlacklist[i.toString()]) {
+                availableKeyIndices.push(i);
             }
         }
 
-        // 如果找不到可用密钥（全部在黑名单中），则使用传统轮询
-        if (leastUsedIndex === -1) {
+        let selectedIndex: number;
+
+        // 如果没有可用密钥（全部在黑名单中），则使用传统轮询
+        if (availableKeyIndices.length === 0) {
+            console.warn(`模型 ${model} 的所有密钥都在黑名单中，将使用传统轮询选择密钥。`);
             // 获取当前模型的轮询索引
             const rotations = await this.getModelRotations();
             let currentIndex = rotations[model] || 0;
@@ -263,15 +262,40 @@ class ApiKeyManager {
             currentIndex = currentIndex % this.apiKeys.length;
             // 更新并保存轮询索引
             await this.saveModelRotation(model, currentIndex + 1);
-            return { key: this.apiKeys[currentIndex] || '', index: currentIndex };
+            selectedIndex = currentIndex;
+        }
+        // 根据策略选择密钥
+        else if (this.selectionStrategy === 'RANDOM') {
+            // 随机选择一个可用密钥
+            const randomIndex = Math.floor(Math.random() * availableKeyIndices.length);
+            selectedIndex = availableKeyIndices[randomIndex]!;
+        } else { // LEAST_USED
+            // 获取API密钥使用记录
+            const usages = await this.getApiKeyUsage();
+            const modelUsage = usages[model] || {};
+
+            // 寻找使用频率最低的可用密钥
+            let leastUsedIndex = -1;
+            let leastUsageCount = Infinity;
+
+            for (const index of availableKeyIndices) {
+                const usageCount = modelUsage[index.toString()] || 0;
+                if (usageCount < leastUsageCount) {
+                    leastUsageCount = usageCount;
+                    leastUsedIndex = index;
+                }
+            }
+            // 如果 leastUsedIndex 没有被赋值，则使用第一个可用密钥
+            selectedIndex = leastUsedIndex !== -1 ? leastUsedIndex : availableKeyIndices[0]!;
         }
 
         // 记录API密钥使用
         if (options.recordUsage) {
-            await this.recordApiKeyUsage(model, leastUsedIndex);
+            await this.recordApiKeyUsage(model, selectedIndex);
         }
 
-        return { key: this.apiKeys[leastUsedIndex] || '', index: leastUsedIndex };
+        // selectedIndex 在这里保证是一个数字，如果 apiKeys 不为空
+        return { key: this.apiKeys[selectedIndex]!, index: selectedIndex };
     }
 
     /**

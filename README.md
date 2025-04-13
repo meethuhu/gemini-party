@@ -78,6 +78,7 @@ docker-compose up -d
 ```
 
 ### 使用 Deno Deploy 部署
+
 1. 复制 [`/serverless/deno.js`](serverless/deno.js) 文件内容
 2. 前往 [`deno.dev`](https://deno.dev) 使用 `New Playground` 功能
 
@@ -88,12 +89,13 @@ docker-compose up -d
 | 参数                      | 描述                                                                     | 必填 | 示例                 |
 | ------------------------- | ------------------------------------------------------------------------ | ---- | -------------------- |
 | `GEMINI_API_KEY`          | Gemini API 密钥，多个密钥用逗号分隔                                      | 是   | `key1,key2,key3`     |
-| `AUTH_TOKEN`              | 访问认证令牌                                       | 是   | `sk-test-1234567890` |
+| `AUTH_TOKEN`              | 访问认证令牌                                                             | 是   | `sk-test-1234567890` |
 | `API_PREFIX`              | API 路径前缀，用于反向代理场景                                           | 否   | `hf`                 |
 | `HARM_CATEGORY_*`         | [Safety settings](https://ai.google.dev/gemini-api/docs/safety-settings) | 否   | `BLOCK_NONE`         |
 | `ROTATION_RESET_INTERVAL` | 轮询重置间隔(毫秒)                                                       | 否   | `60000`              |
 | `BLACKLIST_TIMEOUT`       | 黑名单超时时间(毫秒)                                                     | 否   | `300000`             |
 | `DEFAULT_MAX_RETRIES`     | 最大重试次数                                                             | 否   | `3`                  |
+| `KEY_SELECTION_STRATEGY`  | 负载均衡策略                                                             | 否   | `RANDOM`             |
 
 <p style="font-size:.92rem">* OpenAI 兼容格式不支持 <code>HARM_CATEGORY_*</code> 相关设置</p>
 
