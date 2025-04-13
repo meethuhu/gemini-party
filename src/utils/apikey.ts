@@ -349,10 +349,15 @@ class ApiKeyManager {
         options: BalancingOptions = {}
     ): Promise<T> {
         // 设置默认选项
+        const defaultMaxRetries = config.keyManagement.defaultMaxRetries;
+        const calculatedMaxRetries = defaultMaxRetries === -1
+            ? Infinity
+            : Math.min(defaultMaxRetries, this.apiKeys.length);
+
         const balancingOptions: Required<BalancingOptions> = {
             recordUsage: options.recordUsage ?? true,
             useBlacklist: options.useBlacklist ?? true,
-            maxRetries: options.maxRetries ?? Math.min(config.keyManagement.defaultMaxRetries, this.apiKeys.length)
+            maxRetries: options.maxRetries ?? calculatedMaxRetries
         };
 
         let lastError: any = null;
