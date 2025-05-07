@@ -96,7 +96,7 @@ docker-compose up -d
 | `BLACKLIST_TIMEOUT`       | 黑名单超时时间(毫秒)                                                     | 否   | `300000`             |
 | `DEFAULT_MAX_RETRIES`     | 最大重试次数                                                             | 否   | `3`                  |
 | `KEY_SELECTION_STRATEGY`  | 负载均衡策略                                                             | 否   | `RANDOM`             |
-
+|`GEMINI_API_ENDPOINT`|自定义Gemini端点（必须添加API版本）|否|`https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/google-ai-studio/v1beta`|
 <p style="font-size:.92rem">* OpenAI 兼容格式不支持 <code>HARM_CATEGORY_*</code> 相关设置</p>
 
 ## 💡 使用示例

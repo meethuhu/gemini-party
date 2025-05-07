@@ -8,6 +8,32 @@ import { createErrorResponse, createHonoErrorResponse } from '../utils/error';
 import { geminiAuthMiddleware, openaiAuthMiddleware } from '../utils/middleware';
 import normalizeRequestBody from '../utils/rebody';
 
+// 从环境变量读取自定义 Gemini API 端点，如果未定义则使用默认值
+// @ts-ignore Deno global
+const GEMINI_API_ENDPOINT = typeof process !== 'undefined' && process.env && process.env.GEMINI_API_ENDPOINT
+    // @ts-ignore Deno global
+    ? process.env.GEMINI_API_ENDPOINT
+    : 'https://generativelanguage.googleapis.com/v1beta';
+
+// 辅助函数：构造 Gemini API URL
+function constructGeminiUrl(model: string, action: string, apiKey: string, params?: Record<string, string>): string {
+    let baseUrl = `${GEMINI_API_ENDPOINT}/models/${model}:${action}?key=${apiKey}`;
+    if (params) {
+        for (const [key, value] of Object.entries(params)) {
+            baseUrl += `&${key}=${value}`;
+        }
+    }
+    return baseUrl;
+}
+
+// 辅助函数：构造 Gemini 获取模型信息的 URL (不带 action)
+function constructGeminiModelInfoUrl(apiKey: string, model?: string): string {
+    if (model) {
+        return `${GEMINI_API_ENDPOINT}/models/${model}?key=${apiKey}`;
+    }
+    return `${GEMINI_API_ENDPOINT}/models?key=${apiKey}`;
+}
+
 const genai = new Hono();
 
 genai.use('/models/*', geminiAuthMiddleware);
@@ -27,10 +53,27 @@ const actionHandlers: Record<string, HandlerFunction> = {
 async function handleGenerateContent(c: Context, model: string, apiKey: string, originalBody: any): Promise<Response> {
     const body = normalizeRequestBody(originalBody, model);
 
+    // 显式删除 thinkingConfig 以避免 API 错误
+    if (body.generationConfig && body.generationConfig.hasOwnProperty('thinkingConfig')) {
+        // @ts-ignore 如果 thinkingConfig 确实不应该存在于类型中，这会是一个类型错误，但我们在这里处理运行时问题
+        delete body.generationConfig.thinkingConfig;
+    }
+    // 显式删除 tools 和 systemInstruction 以避免 API 错误
+    // @ts-ignore 根据错误日志，API 端点不识别这些顶层字段
+    if (body.hasOwnProperty('tools')) {
+        delete body.tools;
+    }
+    // @ts-ignore
+    if (body.hasOwnProperty('systemInstruction')) {
+        delete body.systemInstruction;
+    }
+
     try {
         // 使用withRetry包装API调用
         const response = await withRetry(model, async (key) => {
-            const fetchResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+            // 使用辅助函数构造 URL
+            const apiUrl = constructGeminiUrl(model, 'generateContent', key);
+            const fetchResponse = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -56,10 +99,27 @@ async function handleGenerateContentStream(c: Context, model: string,
     apiKey: string, originalBody: any): Promise<Response> {
     const body = normalizeRequestBody(originalBody, model);
 
+    // 显式删除 thinkingConfig 以避免 API 错误
+    if (body.generationConfig && body.generationConfig.hasOwnProperty('thinkingConfig')) {
+        // @ts-ignore 如果 thinkingConfig 确实不应该存在于类型中，这会是一个类型错误，但我们在这里处理运行时问题
+        delete body.generationConfig.thinkingConfig;
+    }
+    // 显式删除 tools 和 systemInstruction 以避免 API 错误
+    // @ts-ignore 根据错误日志，API 端点不识别这些顶层字段
+    if (body.hasOwnProperty('tools')) {
+        delete body.tools;
+    }
+    // @ts-ignore
+    if (body.hasOwnProperty('systemInstruction')) {
+        delete body.systemInstruction;
+    }
+
     try {
         // 使用withRetry包装API调用
         const result = await withRetry(model, async (key) => {
-            const fetchResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${key}&alt=sse`, {
+            // 使用辅助函数构造 URL
+            const apiUrl = constructGeminiUrl(model, 'streamGenerateContent', key, { alt: 'sse' });
+            const fetchResponse = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -141,7 +201,9 @@ async function handleEmbedContent(c: Context, model: string, apiKey: string, bod
     try {
         // 使用withRetry包装API调用
         const response = await withRetry(model, async (key) => {
-            const fetchResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${key}`, {
+            // 使用辅助函数构造 URL
+            const apiUrl = constructGeminiUrl(model, 'embedContent', key);
+            const fetchResponse = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -196,7 +258,8 @@ genai.post('/models/:modelAction{.+:.+}', async (c: Context) => {
 genai.get('/models', async (c: Context) => {
     try {
         const data = await withoutBalancing(async (key) => {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
+            // 使用辅助函数构造 URL
+            const url = constructGeminiModelInfoUrl(key);
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`获取模型列表失败: ${response.statusText}`);
@@ -213,11 +276,12 @@ genai.get('/models', async (c: Context) => {
 
 // 检索模型
 genai.get('/models/:model', async (c: Context) => {
-    const model = c.req.param('model');
+    const modelName = c.req.param('model'); // 使用 modelName 保证唯一性
 
     try {
         const data = await withoutBalancing(async (key) => {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${key}`;
+            // 使用辅助函数构造 URL，并传递 modelName
+            const url = constructGeminiModelInfoUrl(key, modelName);
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`获取模型信息失败: ${response.statusText}`);
@@ -227,7 +291,7 @@ genai.get('/models/:model', async (c: Context) => {
 
         return c.json(data);
     } catch (error) {
-        console.error(`获取模型 ${model} 信息错误:`, error);
+        console.error(`获取模型 ${modelName} 信息错误:`, error);
         return createHonoErrorResponse(c, error);
     }
 });
@@ -247,6 +311,9 @@ genai.post('/openai/embeddings', async (c) => {
         const embeddingResponse = await withRetry(model, async (key) => {
             const openai = new OpenAI({
                 apiKey: key,
+                // 注意：这里的 baseURL 仍然指向 Google 的 OpenAI 兼容端点。
+                // 如果需要，也可以将其配置为环境变量。
+                // GEMINI_API_ENDPOINT 通常用于 Gemini 原生 API。
                 baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
             });
 
