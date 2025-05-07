@@ -3,7 +3,6 @@
   "version": "1.1.0",
   "module": "index.ts",
   "dependencies": {
-    "@google/genai": "^0.7.0",
     "hono": "^4.7.5",
     "openai": "^4.92.1"
   },
@@ -14,8 +13,8 @@
   "scripts": {
     "start": "bun ./src/index.ts",
     "docker-build": "docker build --pull -t gemini-party .",
-    "bun-build": "bun build ./src/index.ts --outfile ./serverless/bun.js --target=node --external hono --external @google/genai --external openai",
-    "deno-build": "bun build ./src/index.ts --outfile ./serverless/deno.js --target=node --external hono --external @google/genai --external openai && node scripts/deno-modify-imports.js",
+    "bun-build": "bun build ./src/index.ts --outfile ./serverless/bun.js --target=node --external hono --external openai",
+    "deno-build": "bun build ./src/index.ts --outfile ./serverless/deno.js --target=node --external hono --external openai && node scripts/deno-modify-imports.js",
     "release": "node scripts/release.js",
     "release:minor": "node scripts/release.js minor",
     "release:major": "node scripts/release.js major",

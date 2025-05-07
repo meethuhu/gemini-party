@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
@@ -31,10 +30,18 @@ async function handleGenerateContent(c: Context, model: string, apiKey: string, 
     try {
         // 使用withRetry包装API调用
         const response = await withRetry(model, async (key) => {
-            const ai = new GoogleGenAI({ apiKey: key });
-            return await ai.models.generateContent({
-                ...body,
+            const fetchResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body),
             });
+            if (!fetchResponse.ok) {
+                const errorText = await fetchResponse.text();
+                throw new Error(`API 请求失败，状态码: ${fetchResponse.status}: ${errorText}`);
+            }
+            return await fetchResponse.json() as Record<string, any>;
         });
 
         return c.json(response);
@@ -52,21 +59,61 @@ async function handleGenerateContentStream(c: Context, model: string,
     try {
         // 使用withRetry包装API调用
         const result = await withRetry(model, async (key) => {
-            const ai = new GoogleGenAI({ apiKey: key });
-            return await ai.models.generateContentStream({
-                ...body,
+            const fetchResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${key}&alt=sse`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body),
             });
+            if (!fetchResponse.ok) {
+                const errorText = await fetchResponse.text();
+                throw new Error(`API 请求失败，状态码: ${fetchResponse.status}: ${errorText}`);
+            }
+            return fetchResponse.body; // 直接返回 ReadableStream
         });
 
         // Hono 流式响应
         return streamSSE(c, async (stream) => {
+            if (!result) {
+                // 如果withRetry正常工作并在出错时抛出异常，这里不应该发生
+                console.error('流式处理错误: result 为 null');
+                const { body: errorBody } = createErrorResponse({ message: '流生成失败，无响应体' });
+                await stream.writeSSE({
+                    data: JSON.stringify(errorBody),
+                });
+                return;
+            }
+            const reader = result.getReader();
+            const decoder = new TextDecoder();
+
             try {
-                for await (const chunk of result) {
-                    await stream.writeSSE({
-                        data: JSON.stringify(chunk),
-                    });
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) {
+                        break;
+                    }
+                    const chunk = decoder.decode(value, { stream: true });
+                    // SSE 以 "data: {JSON_CONTENT}\n\n" 格式发送数据
+                    // 我们需要正确解析它
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const jsonData = line.substring(5); // 移除 "data: " 前缀
+                            if (jsonData.trim()) { // 确保 jsonData 不只是空白字符
+                                try {
+                                   const parsedJson = JSON.parse(jsonData);
+                                   await stream.writeSSE({
+                                       data: JSON.stringify(parsedJson), // Hono期望字符串，因此重新字符串化
+                                   });
+                                } catch (e) {
+                                    console.error('从流式块解析JSON时出错:', jsonData, e);
+                                    // 可选：向客户端发送错误消息
+                                }
+                            }
+                        }
+                    }
                 }
-                // Gemini 流式响应不应包含 [DONE] 消息
             } catch (e) {
                 console.error('Streaming error:', e);
                 const { body } = createErrorResponse(e);
@@ -83,21 +130,33 @@ async function handleGenerateContentStream(c: Context, model: string,
 
 // Embeddings
 async function handleEmbedContent(c: Context, model: string, apiKey: string, body: any): Promise<Response> {
-    const contents = body.content;
+    const contents = body.content; // 对于REST API，这里应该是 `body.contents`
+    const requestBody = {
+        content: body.content, // 确保这与REST API预期的结构匹配
+        task_type: body.task_type,
+        title: body.title,
+        output_dimensionality: body.outputDimensionality, // 已修正字段名
+    };
 
     try {
         // 使用withRetry包装API调用
         const response = await withRetry(model, async (key) => {
-            const ai = new GoogleGenAI({ apiKey: key });
-            return await ai.models.embedContent({
-                model, contents, config: {
-                    taskType: body.task_type, title: body.title, outputDimensionality: body.outputDimensionality,
+            const fetchResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${key}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
                 },
+                body: JSON.stringify(requestBody),
             });
+            if (!fetchResponse.ok) {
+                const errorText = await fetchResponse.text();
+                throw new Error(`API 请求失败，状态码: ${fetchResponse.status}: ${errorText}`);
+            }
+            return await fetchResponse.json() as { embedding?: { values: number[] } }; // 为嵌入响应添加了特定类型
         });
 
         return c.json({
-            embedding: response?.embeddings?.[0] || { values: [] },
+            embedding: response?.embedding || { values: [] }, // 已调整以匹配新的响应结构
         });
     } catch (error) {
         console.error('Embed content error:', error);
