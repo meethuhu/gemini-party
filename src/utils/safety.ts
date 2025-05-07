@@ -1,7 +1,29 @@
-import type {HarmBlockThreshold, HarmCategory, SafetySetting} from '@google/genai';
+// import type {HarmBlockThreshold, HarmCategory, SafetySetting} from '@google/genai'; // 从@google/genai导入类型的旧方式
 import {config} from './config';
 
-// 验证内容过滤器设置
+// 根据常见的 Google AI 安全类别定义 HarmCategory
+export type HarmCategory =
+    | 'HARASSMENT'
+    | 'HATE_SPEECH'
+    | 'SEXUALLY_EXPLICIT'
+    | 'DANGEROUS_CONTENT'
+    | 'HARM_CATEGORY_UNSPECIFIED'; // 为完整性添加，尽管通常不直接在设置中使用
+
+// 根据常见的 Google AI 安全阈值定义 HarmBlockThreshold
+export type HarmBlockThreshold =
+    | 'HARM_BLOCK_THRESHOLD_UNSPECIFIED'
+    | 'BLOCK_LOW_AND_ABOVE'
+    | 'BLOCK_MEDIUM_AND_ABOVE'
+    | 'BLOCK_ONLY_HIGH'
+    | 'BLOCK_NONE';
+
+// 定义 SafetySetting 结构
+export interface SafetySetting {
+    category: HarmCategory;
+    threshold: HarmBlockThreshold;
+}
+
+// 验证内容过滤器设置 (此数组内容已经是中文语境下的常量，无需翻译)
 const VALID_HARM_THRESHOLDS: string[] = [
     'BLOCK_NONE',
     'BLOCK_ONLY_HIGH',

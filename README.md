@@ -96,8 +96,35 @@ docker-compose up -d
 | `BLACKLIST_TIMEOUT`       | 黑名单超时时间(毫秒)                                                     | 否   | `300000`             |
 | `DEFAULT_MAX_RETRIES`     | 最大重试次数                                                             | 否   | `3`                  |
 | `KEY_SELECTION_STRATEGY`  | 负载均衡策略                                                             | 否   | `RANDOM`             |
-
+|`GEMINI_API_ENDPOINT`|自定义Gemini端点（必须添加API版本）|否|`https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/google-ai-studio/v1beta`|
 <p style="font-size:.92rem">* OpenAI 兼容格式不支持 <code>HARM_CATEGORY_*</code> 相关设置</p>
+
+### Cloudflare AI Gateway 自定义模型成本
+
+如果您通过 Cloudflare AI Gateway 路由请求 (即 `GEMINI_API_ENDPOINT` 或 `GEMINI_OPENAI_COMPAT_ENDPOINT` 指向 `gateway.ai.cloudflare.com`), 您可以为每个模型设置自定义成本。这允许 Gemini Party 在记录和分析时使用您与模型提供商协商的特定价格。
+
+要配置自定义成本，请在您的 `.env` 文件中为每个相关模型添加以下格式的环境变量：
+
+*   `MODEL_<MODEL_NAME>_COST_IN`: 每输入 token 的成本。
+*   `MODEL_<MODEL_NAME>_COST_OUT`: 每输出 token 的成本。
+
+将 `<MODEL_NAME>` 替换为实际的模型名称 (例如 `GEMINI-PRO`, `GEMINI-1.5-FLASH-LATEST`, 等)。模型名称将被转换为大写，并且所有非字母数字字符（下划线除外）都将替换为下划线。
+
+**示例:**
+
+```env
+GEMINI_API_ENDPOINT="https://gateway.ai.cloudflare.com/v1/YOUR_ACCOUNT_ID/YOUR_GATEWAY_ID/google-ai-studio/v1beta"
+
+# gemini-pro 模型的自定义成本
+MODEL_GEMINI_PRO_COST_IN="0.000001"
+MODEL_GEMINI_PRO_COST_OUT="0.000002"
+
+# gemini-1.5-flash-latest 模型的自定义成本 (注意模型名称中的 '-' 被替换为 '_'，并且所有非字母数字字符（下划线除外）都将替换为下划线)
+MODEL_GEMINI_1_5_FLASH_LATEST_COST_IN="0.0000005"
+MODEL_GEMINI_1_5_FLASH_LATEST_COST_OUT="0.0000015"
+```
+
+如果为特定模型设置了这些变量，并且请求通过 Cloudflare AI Gateway，Gemini Party 将自动在请求中添加 `cf-aig-custom-cost` header。
 
 ## 💡 使用示例
 

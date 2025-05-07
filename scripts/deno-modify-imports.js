@@ -23,7 +23,6 @@ function getPackageInfo() {
     version,
     dependencies: {
       hono: cleanVersion(dependencies.hono || ''),
-      genai: cleanVersion(dependencies['@google/genai'] || ''),
       openai: cleanVersion(dependencies.openai || '')
     }
   };
@@ -37,7 +36,6 @@ const replacements = [
   // 第三方依赖包
   { from: 'from "hono";', to: `from "npm:hono@${pkgInfo.dependencies.hono}";` },
   { from: 'from "hono/', to: `from "npm:hono@${pkgInfo.dependencies.hono}/` },
-  { from: 'from "@google/genai";', to: `from "npm:@google/genai@${pkgInfo.dependencies.genai}";` },
   { from: 'from "openai";', to: `from "npm:openai@${pkgInfo.dependencies.openai}";` },
   
   // Node.js 内置模块 - 添加node:前缀
