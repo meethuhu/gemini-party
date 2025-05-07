@@ -79,20 +79,7 @@ const actionHandlers: Record<string, HandlerFunction> = {
 async function handleGenerateContent(c: Context, model: string, apiKey: string, originalBody: any): Promise<Response> {
     const body = normalizeRequestBody(originalBody, model);
 
-    // 显式删除 thinkingConfig 以避免 API 错误
-    if (body.generationConfig && body.generationConfig.hasOwnProperty('thinkingConfig')) {
-        // @ts-ignore 如果 thinkingConfig 确实不应该存在于类型中，这会是一个类型错误，但我们在这里处理运行时问题
-        delete body.generationConfig.thinkingConfig;
-    }
-    // 显式删除 tools 和 systemInstruction 以避免 API 错误
-    // @ts-ignore 根据错误日志，API 端点不识别这些顶层字段
-    if (body.hasOwnProperty('tools')) {
-        delete body.tools;
-    }
-    // @ts-ignore
-    if (body.hasOwnProperty('systemInstruction')) {
-        delete body.systemInstruction;
-    }
+    // thinkingConfig, systemInstruction, and tools will no longer be deleted.
 
     try {
         // 使用withRetry包装API调用
@@ -135,20 +122,7 @@ async function handleGenerateContentStream(c: Context, model: string,
     apiKey: string, originalBody: any): Promise<Response> {
     const body = normalizeRequestBody(originalBody, model);
 
-    // 显式删除 thinkingConfig 以避免 API 错误
-    if (body.generationConfig && body.generationConfig.hasOwnProperty('thinkingConfig')) {
-        // @ts-ignore 如果 thinkingConfig 确实不应该存在于类型中，这会是一个类型错误，但我们在这里处理运行时问题
-        delete body.generationConfig.thinkingConfig;
-    }
-    // 显式删除 tools 和 systemInstruction 以避免 API 错误
-    // @ts-ignore 根据错误日志，API 端点不识别这些顶层字段
-    if (body.hasOwnProperty('tools')) {
-        delete body.tools;
-    }
-    // @ts-ignore
-    if (body.hasOwnProperty('systemInstruction')) {
-        delete body.systemInstruction;
-    }
+    // thinkingConfig, systemInstruction, and tools will no longer be deleted.
 
     try {
         // 使用withRetry包装API调用
